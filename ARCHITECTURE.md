@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: технический план Stage 0. Приложение, инфраструктура и тесты пока не реализованы. Все описанные ниже механизмы — целевая реализация. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с техническими уточнениями Stage 1. Реализован минимальный Foundation; его фактические проверки описаны в REPORT. Предметные функции, БД, Docker и OpenAPI runtime ниже остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -23,19 +23,27 @@
 
 Стек принят из разделов 18–22, 27, 29 и 31 `DISCOVERY.md`.
 
-| Область | Технологии |
-| --- | --- |
-| Репозиторий | Git, GitHub, monorepo, pnpm workspaces |
-| Frontend | React, TypeScript, Vite, React Router |
-| Данные и формы | TanStack Query, React Hook Form, Zod |
-| Интерфейс | Tailwind CSS, shadcn/ui, Radix UI, Recharts, Lucide, Motion |
-| Backend | Node.js, TypeScript, NestJS, Nest scheduling |
-| БД | PostgreSQL, Prisma ORM |
-| Контракты и вход | REST, Swagger/OpenAPI, JWT в HttpOnly cookie, Argon2id |
-| Проверки UI | Vitest, Testing Library, Playwright |
-| Инфраструктура | Docker, Docker Compose, Nginx, GitHub Actions |
+| Область          | Технологии                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| Репозиторий      | Git, GitHub, monorepo, pnpm workspaces                      |
+| Frontend         | React, TypeScript, Vite, React Router                       |
+| Данные и формы   | TanStack Query, React Hook Form, Zod                        |
+| Интерфейс        | Tailwind CSS, shadcn/ui, Radix UI, Recharts, Lucide, Motion |
+| Backend          | Node.js, TypeScript, NestJS, Nest scheduling                |
+| БД               | PostgreSQL, Prisma ORM                                      |
+| Контракты и вход | REST, Swagger/OpenAPI, JWT в HttpOnly cookie, Argon2id      |
+| Проверки UI      | Vitest, Testing Library, Playwright                         |
+| Инфраструктура   | Docker, Docker Compose, Nginx, GitHub Actions               |
 
 Backend — модульный монолит. Совместимые версии Node.js, pnpm и пакетов фиксируются при начале разработки, затем закрепляются lockfile и образами. Stage 0 не выбирает версии без проверки совместимости и ничего не устанавливает. Инструменты форматирования, lint и генерации OpenAPI-клиента фиксируются в Foundation как инструменты сборки, без замены утвержденного стека.
+
+На Stage 1 закреплены Node.js 24.21.0 LTS, pnpm 12.4.1, React 19.3.0,
+Vite 8.3.0, TypeScript 6.0.3, NestJS 12.0.1, Nest CLI 12.0.0,
+ESLint 10.10.0, Prettier 3.9.6, Vitest 4.1.11 и Testing Library React 16.3.3.
+Backend использует ESM/NodeNext, стандартный tsc с decorator metadata и встроенный
+`node:test` из закрепленного Node.js. Strict TypeScript применяется к исходникам,
+тестам и конфигам; `skipLibCheck` не включен. Exact dependencies и lockfile
+закрепляют установку, `.nvmrc` и engines — runtime, `packageManager` — pnpm.
 
 ## 4. Общая схема и топология
 
@@ -61,7 +69,7 @@ Compose содержит ровно три сервиса: `web`, `api`, `postgr
 
 ## 5. Ожидаемая структура репозитория
 
-Ниже план, а не созданные каталоги. Скелет появляется на Stage 1; предметные модули добавляются в соответствующих этапах.
+Ниже целевая структура. На Stage 1 созданы только `apps/web`, `apps/api`, граница `packages/api-client` и CI. Предметные каталоги и инфраструктура добавляются в соответствующих этапах.
 
 ```text
 /
@@ -120,18 +128,18 @@ TanStack Query хранит серверное состояние. Ключи з
 
 NestJS реализует поток `Controller → Service → Prisma → PostgreSQL`. Controller описывает HTTP-контракт, получает authentication context и валидирует вход. Service проверяет бизнес-правила и ownership, управляет DB transaction. PrismaService предоставляет Prisma и транзакционный клиент. Универсальный repository поверх Prisma, CQRS, event bus, инфраструктура domain events и дополнительные application layers не вводятся.
 
-| Модуль | Ответственность |
-| --- | --- |
-| `AuthModule` | Регистрация, вход/выход, JWT cookie, guard, rate limiting |
-| `UsersModule` | Профиль, настройки валюты/timezone, получение владельца |
-| `CategoriesModule` | Стандартные категории, CRUD, типы и архивирование |
-| `TransactionsModule` | Операции, денежные расчеты, поиск/фильтры, экспорт |
-| `BudgetsModule` | Лимиты и использование бюджета |
-| `RecurringTransactionsModule` | Правила, календарный расчет и scheduler |
-| `DashboardModule` | Агрегации и детерминированные Financial Insights |
-| `ImportsModule` | CSV parsing, mapping, проверка и импорт |
-| `AuditModule` | Атомарная запись снимков и чтение журнала |
-| `HealthModule` | Liveness и readiness |
+| Модуль                        | Ответственность                                           |
+| ----------------------------- | --------------------------------------------------------- |
+| `AuthModule`                  | Регистрация, вход/выход, JWT cookie, guard, rate limiting |
+| `UsersModule`                 | Профиль, настройки валюты/timezone, получение владельца   |
+| `CategoriesModule`            | Стандартные категории, CRUD, типы и архивирование         |
+| `TransactionsModule`          | Операции, денежные расчеты, поиск/фильтры, экспорт        |
+| `BudgetsModule`               | Лимиты и использование бюджета                            |
+| `RecurringTransactionsModule` | Правила, календарный расчет и scheduler                   |
+| `DashboardModule`             | Агрегации и детерминированные Financial Insights          |
+| `ImportsModule`               | CSV parsing, mapping, проверка и импорт                   |
+| `AuditModule`                 | Атомарная запись снимков и чтение журнала                 |
+| `HealthModule`                | Liveness и readiness                                      |
 
 Модули экспортируют только нужные сервисные операции. Создание транзакции вручную, из CSV и scheduler использует одинаковые проверки и расчеты; внутренний метод принимает транзакционный Prisma-клиент, чтобы вызывающий сервис контролировал атомарность. Audit writer использует тот же клиент и не открывает независимую транзакцию. Общие money/date-функции остаются чистыми и тестируемыми; отдельная доменная платформа не нужна.
 
@@ -147,14 +155,14 @@ NestJS реализует поток `Controller → Service → Prisma → Post
 
 Основные таблицы и поля берутся из `DISCOVERY.md`, раздел 20; имена таблиц в PostgreSQL — `users`, `categories`, `transactions`, `budgets`, `recurring_transactions`, `audit_entries`. Prisma-модели сохраняют английские identifiers с явным mapping к таблицам.
 
-| Таблица | Ключевые данные и ограничения |
-| --- | --- |
-| `users` | Уникальный нормализованный `email`, `passwordHash`, `displayName`, `baseCurrency`, IANA `timeZone`, `themePreference`, timestamps |
-| `categories` | `userId`, `name`, `type`, `icon`, `color`, `archivedAt`; принадлежность пользователю |
-| `transactions` | Владелец, категория, тип, `amount`, `currency`, `exchangeRate`, `amountInBaseCurrency`, `description`, `transactionDate`, `source`, необязательная пара recurring-полей |
-| `budgets` | Владелец, expense-категория, `year`, `month`, `limitAmount`; `UNIQUE(userId, categoryId, year, month)` |
-| `recurring_transactions` | Владелец, категория, денежный шаблон, `frequency`, `dayOfMonth`, `startDate`, `endDate`, `nextOccurrenceDate`, `archivedAt` |
-| `audit_entries` | `userId`, `entityType`, `entityId`, `action`, `before`, `after`, `createdAt`; снимки `JSONB` |
+| Таблица                  | Ключевые данные и ограничения                                                                                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                  | Уникальный нормализованный `email`, `passwordHash`, `displayName`, `baseCurrency`, IANA `timeZone`, `themePreference`, timestamps                                       |
+| `categories`             | `userId`, `name`, `type`, `icon`, `color`, `archivedAt`; принадлежность пользователю                                                                                    |
+| `transactions`           | Владелец, категория, тип, `amount`, `currency`, `exchangeRate`, `amountInBaseCurrency`, `description`, `transactionDate`, `source`, необязательная пара recurring-полей |
+| `budgets`                | Владелец, expense-категория, `year`, `month`, `limitAmount`; `UNIQUE(userId, categoryId, year, month)`                                                                  |
+| `recurring_transactions` | Владелец, категория, денежный шаблон, `frequency`, `dayOfMonth`, `startDate`, `endDate`, `nextOccurrenceDate`, `archivedAt`                                             |
+| `audit_entries`          | `userId`, `entityType`, `entityId`, `action`, `before`, `after`, `createdAt`; снимки `JSONB`                                                                            |
 
 Деньги и курсы — `NUMERIC/DECIMAL`, бизнес-даты — `DATE`, системные `createdAt`, `updatedAt`, `archivedAt` — `TIMESTAMPTZ`. `transactionDate`, `recurringOccurrenceDate`, `startDate`, `endDate`, `nextOccurrenceDate` не преобразуются через полночь UTC. `year/month` бюджета — целые календарные значения; `month` ограничен диапазоном 1–12.
 
@@ -182,7 +190,7 @@ NestJS реализует поток `Controller → Service → Prisma → Post
 
 Транзакции поддерживают поиск по `description`/названию категории, диапазон дат, тип, категорию, сумму min/max и валюту; разрешенные сортировки: новые/старые сначала, сумма по возрастанию/убыванию. Для сопоставления разных валют фильтр суммы и сортировка используют `amountInBaseCurrency`; UI явно подписывает основную валюту. Это уточнение технического контракта для реализации не изменяет сохраненную исходную сумму. Сортировка всегда дополняется `id` для стабильной пагинации. Даты в API — `YYYY-MM-DD`, timestamps — ISO 8601 с timezone, деньги — decimal strings.
 
-DTO, ответы, cookie security scheme, примеры и ошибки описываются в OpenAPI на русском языке. Спецификация генерируется из backend-контракта, затем из нее генерируются frontend types/client в `packages/api-client`. Генератор выбирается на Stage 1; Stage 2 проверяет цикл на реальном API. Генерируемые файлы не редактируются вручную. CI воспроизводит генерацию и обнаруживает рассинхронизацию. Prisma-модели не являются публичными API DTO. Ошибки всех ресурсов используют раздел 19.
+DTO, ответы, cookie security scheme, примеры и ошибки описываются в OpenAPI на русском языке. Спецификация генерируется из backend-контракта, затем из нее генерируются frontend types/client в `packages/api-client`. На Stage 1 выбран Orval 8.33.0 (Fetch client/types и поддержка будущих TanStack Query hooks). Сейчас `packages/api-client` содержит только manifest и описание границы, без exports, DTO и установленного generator. На Stage 2 Orval устанавливается в этой точной версии с lockfile и проверяется цикл на реальном API. Генерируемые файлы не редактируются вручную. CI воспроизводит генерацию и обнаруживает рассинхронизацию. Prisma-модели не являются публичными API DTO. Ошибки всех ресурсов используют раздел 19.
 
 ## 11. Аутентификация, авторизация и сессия
 
@@ -273,11 +281,11 @@ Financial Insights — чистые детерминированные прав�
 
 ## 18. Три уровня валидации
 
-| Уровень | Ответственность |
-| --- | --- |
-| Frontend | Формат ввода, обязательные поля, быстрые подсказки и отображение ошибок сервера; не граница безопасности |
-| Backend | Авторитетная проверка схемы, диапазонов, бизнес-правил, ownership, валюты/даты, согласованности связанных сущностей |
-| Database | PK/FK, уникальность, `CHECK`, транзакции и защита от конкурентных нарушений |
+| Уровень  | Ответственность                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------- |
+| Frontend | Формат ввода, обязательные поля, быстрые подсказки и отображение ошибок сервера; не граница безопасности            |
+| Backend  | Авторитетная проверка схемы, диапазонов, бизнес-правил, ownership, валюты/даты, согласованности связанных сущностей |
+| Database | PK/FK, уникальность, `CHECK`, транзакции и защита от конкурентных нарушений                                         |
 
 Генерируемые TypeScript types обеспечивают статическую совместимость, но не runtime validation. Backend отклоняет неожиданные поля и не преобразует неоднозначные значения молча. В каждой доменной функции явно определено, какие проверки выполняются до записи и какие повторяются внутри транзакции.
 
@@ -312,14 +320,14 @@ Backend пишет структурированные JSON-логи: безоп�
 
 Минимум задания — 10 unit/integration тестов — обязателен и превышается. Цель Discovery: 25–40 содержательных автоматических тестов плюс Playwright smoke suite. Число не заменяет покрытие рисков и не является запретом на дополнительные необходимые проверки. Тесты добавляются вместе с этапами, Stage 11 закрывает пробелы.
 
-| Уровень | Приоритетные проверки |
-| --- | --- |
-| Unit backend | Decimal-расчеты и округление, календарь 28/29/30/31, timezone, fingerprint CSV, savings rate без дохода, правила Insights |
+| Уровень             | Приоритетные проверки                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit backend        | Decimal-расчеты и округление, календарь 28/29/30/31, timezone, fingerprint CSV, savings rate без дохода, правила Insights                                           |
 | Integration backend | Реальная тестовая PostgreSQL: auth/изоляция, тип/архив категории, уникальность бюджета, конкурентная recurring-генерация и catch-up, rollback audit, migration/seed |
-| Компоненты frontend | Vitest + Testing Library: формы, ошибки validation, фильтры, loading/empty/error, mapping, keyboard/focus |
-| E2E | Playwright: login → dashboard; создание операции; фильтрация; CSV import; проверка изоляции двух пользователей |
+| Компоненты frontend | Vitest + Testing Library: формы, ошибки validation, фильтры, loading/empty/error, mapping, keyboard/focus                                                           |
+| E2E                 | Playwright: login → dashboard; создание операции; фильтрация; CSV import; проверка изоляции двух пользователей                                                      |
 
-Backend-тесты используют тестовый runner, согласованный с NestJS и сборкой на Stage 1; замена PostgreSQL на SQLite/in-memory не допускается для integration. Тестовая БД изолирована от demo-volume, состояние воспроизводимо. Время scheduler передается через тестируемый источник времени, а не реальные ожидания. Отдельно проверяются конкуренция и перезапуск, границы денежных диапазонов, отсутствие audit при rollback, CSV с 10 000 строками и экспорт за пределами страницы.
+На Stage 1 backend-тесты компилируются тем же TypeScript с Nest decorator metadata и запускаются стабильным `node:test`; это проверено на реальном HTTP bootstrap, без Jest/SWC-трансформеров. Выбор поддерживает ESM NestJS 12 и не требует дополнительных test dependencies. В дальнейшем замена PostgreSQL на SQLite/in-memory не допускается для integration. Тестовая БД изолирована от demo-volume, состояние воспроизводимо. Время scheduler передается через тестируемый источник времени, а не реальные ожидания. Отдельно проверяются конкуренция и перезапуск, границы денежных диапазонов, отсутствие audit при rollback, CSV с 10 000 строками и экспорт за пределами страницы.
 
 Дополнительные E2E для budget/recurring/audit допустимы при наличии времени, но соответствующие бизнес-правила обязательно проверяются unit/integration. Доступность и mobile проверяются вместе с UI; финально выполняются smoke и ручная демонстрация. Точный набор команд документируется после появления конфигурации, результаты — только после запуска.
 
@@ -345,7 +353,7 @@ cd <repo>
 docker compose up
 ```
 
-Это будущий контракт, сейчас команды приложения отсутствуют. Единственные внешние предпосылки — Git, работающий Docker с Compose и доступ для загрузки образов/зависимостей. Не нужны локальные Node.js/pnpm, ручное создание БД, `.env`, миграции, seed или редактирование конфигурации.
+Это будущий контракт Docker; текущие команды локального Foundation описаны в README. Единственные внешние предпосылки — Git, работающий Docker с Compose и доступ для загрузки образов/зависимостей. Не нужны локальные Node.js/pnpm, ручное создание БД, `.env`, миграции, seed или редактирование конфигурации.
 
 `postgres`: закрепленный образ, persistent volume, healthcheck. `api`: многостадийная сборка с lockfile, сгенерированным Prisma client, миграциями и исполняемым seed внутри образа. `web`: production build Vite, раздаваемый Nginx, fallback для React Router и отдельное проксирование `/api/v1` и `/docs` перед fallback.
 
@@ -370,7 +378,7 @@ GitHub Actions постепенно реализует обязательный 
 
 Foundation дает начальные install/lint/format/typecheck/tests/build; Stage 2 добавляет PostgreSQL, генерацию контрактов и Docker build; следующие этапы расширяют реальные тесты. Playwright может выполняться отдельным job с поднятым Compose и ожиданием readiness, если это упрощает время выполнения и диагностику; сам smoke suite обязателен к финалу. Отчеты падений и E2E artifacts не должны содержать секреты.
 
-Адекватная Git history обязательна: архитектурная документация должна попасть в commit до application code, затем каждый законченный шаг оформляется логически. Сейчас Git не инициализирован; до первого изменения Stage 1 необходимо создать новый репозиторий и отдельно зафиксировать Stage 0 по разрешению пользователя. Агент не выполняет commit самовольно. Финальная сдача включает GitHub-репозиторий и успешный CI.
+Адекватная Git history обязательна: архитектурная документация должна попасть в commit до application code, затем каждый законченный шаг оформляется логически. Preflight Stage 1 подтвердил существующий Git-репозиторий и отдельный commit документации `bb3ff1a` до первого application code. Remote `origin` связан с GitHub. Агент не выполняет commit самовольно. Финальная сдача включает GitHub-репозиторий и успешный CI.
 
 ## 25. Производительность
 
@@ -380,32 +388,32 @@ Foundation дает начальные install/lint/format/typecheck/tests/build
 
 ## 26. Решения и компромиссы
 
-| Решение | Причина и компромисс |
-| --- | --- |
-| Модульный монолит NestJS | Явные предметные границы и общие DB transactions при одном процессе; независимое масштабирование модулей пока не требуется |
-| Отдельный REST backend | Выполнение задания, живой Swagger, самостоятельная серверная авторизация; контракт синхронизируется генерацией |
-| PostgreSQL | Decimal, даты, FK/unique/check, JSONB и агрегации; нужна настоящая БД в integration и Compose |
-| Prisma | Типизированный доступ и управляемые миграции; сложные constraints/блокировки остаются в небольшом явном SQL |
-| TypeScript во всем приложении | Совместимость типов и сопровождение; типы не заменяют runtime validation |
-| Курс-снимок без внешнего FX API | Историческая воспроизводимость и автономный demo-запуск; foreign-currency курс вводится пользователем |
-| Scheduler внутри backend | Достаточно для monthly/catch-up; конкурентность и перезапуск защищаются БД |
-| Без Redis/RabbitMQ/микросервисов | Для текущего объема достаточно PostgreSQL и одного API; меньше инфраструктурных отказов |
-| Детерминированные Financial Insights | Объяснимость и воспроизводимые тесты, нет LLM и зависимости от внешнего сервиса |
-| Same-origin через Nginx | Единое cookie-поведение; proxy и локальный HTTP требуют ранних E2E проверок |
+| Решение                              | Причина и компромисс                                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Модульный монолит NestJS             | Явные предметные границы и общие DB transactions при одном процессе; независимое масштабирование модулей пока не требуется |
+| Отдельный REST backend               | Выполнение задания, живой Swagger, самостоятельная серверная авторизация; контракт синхронизируется генерацией             |
+| PostgreSQL                           | Decimal, даты, FK/unique/check, JSONB и агрегации; нужна настоящая БД в integration и Compose                              |
+| Prisma                               | Типизированный доступ и управляемые миграции; сложные constraints/блокировки остаются в небольшом явном SQL                |
+| TypeScript во всем приложении        | Совместимость типов и сопровождение; типы не заменяют runtime validation                                                   |
+| Курс-снимок без внешнего FX API      | Историческая воспроизводимость и автономный demo-запуск; foreign-currency курс вводится пользователем                      |
+| Scheduler внутри backend             | Достаточно для monthly/catch-up; конкурентность и перезапуск защищаются БД                                                 |
+| Без Redis/RabbitMQ/микросервисов     | Для текущего объема достаточно PostgreSQL и одного API; меньше инфраструктурных отказов                                    |
+| Детерминированные Financial Insights | Объяснимость и воспроизводимые тесты, нет LLM и зависимости от внешнего сервиса                                            |
+| Same-origin через Nginx              | Единое cookie-поведение; proxy и локальный HTTP требуют ранних E2E проверок                                                |
 
 Все сознательно исключенные возможности остаются исключенными согласно `DISCOVERY.md`, раздел 34. Необязательные улучшения из раздела 32 не вытесняют обязательные функции и светлую тему.
 
 ## 27. Риски и меры
 
-| Риск | Мера | Проверка/этап |
-| --- | --- | --- |
-| Docker startup | Readiness, последовательные миграции/seed, готовые demo defaults, отсутствие host-зависимостей | Чистый и повторный запуск, Stage 2 и 12 |
-| Cookie/CORS/proxy | Один origin, явные HTTP demo/HTTPS production режимы, Origin validation | Auth E2E и негативные запросы, Stage 4/11 |
-| Повтор recurring | Unique recurring-пары, блокировки, атомарное продвижение даты, учет audit после удаления операции | Параллельные запуски, downtime/restart, Stage 8 |
-| Качество CSV | Ограничения, preview, явный mapping, повторная validation, предупреждение дублей | Пограничные файлы, partial import и потерянный ответ, Stage 9 |
-| Финансовая точность | Decimal strings, decimal-арифметика, snapshot, запрет смены baseCurrency после данных | Округление, диапазоны, конкурентная первая запись, Stage 2/5 |
-| Нарушение ownership | Auth context, server predicates, составные FK | Два пользователя и подмена ссылок, Stage 4–11 |
-| Потеря audit | Общая DB transaction, неизменяемые снимки с первой мутации | Принудительный rollback, Stage 4–10 |
-| Объем функций вытесняет качество UI | Границы roadmap, небольшие законченные изменения, необязательные функции откладываются первыми | Поэтапная приемка и demo, Stage 3–12 |
+| Риск                                | Мера                                                                                              | Проверка/этап                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Docker startup                      | Readiness, последовательные миграции/seed, готовые demo defaults, отсутствие host-зависимостей    | Чистый и повторный запуск, Stage 2 и 12                       |
+| Cookie/CORS/proxy                   | Один origin, явные HTTP demo/HTTPS production режимы, Origin validation                           | Auth E2E и негативные запросы, Stage 4/11                     |
+| Повтор recurring                    | Unique recurring-пары, блокировки, атомарное продвижение даты, учет audit после удаления операции | Параллельные запуски, downtime/restart, Stage 8               |
+| Качество CSV                        | Ограничения, preview, явный mapping, повторная validation, предупреждение дублей                  | Пограничные файлы, partial import и потерянный ответ, Stage 9 |
+| Финансовая точность                 | Decimal strings, decimal-арифметика, snapshot, запрет смены baseCurrency после данных             | Округление, диапазоны, конкурентная первая запись, Stage 2/5  |
+| Нарушение ownership                 | Auth context, server predicates, составные FK                                                     | Два пользователя и подмена ссылок, Stage 4–11                 |
+| Потеря audit                        | Общая DB transaction, неизменяемые снимки с первой мутации                                        | Принудительный rollback, Stage 4–10                           |
+| Объем функций вытесняет качество UI | Границы roadmap, небольшие законченные изменения, необязательные функции откладываются первыми    | Поэтапная приемка и demo, Stage 3–12                          |
 
 Ни один риск не снимает обязательных требований. Обнаруженное несоответствие фиксируется до дальнейшей реализации затронутой части.

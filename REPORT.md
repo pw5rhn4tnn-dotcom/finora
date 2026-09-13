@@ -60,3 +60,223 @@ Application code, `apps/web`, `apps/api`, package/workspace config, dependencies
 Проверка состава файлов использована вместо Git diff, поскольку репозиторий не инициализирован. Lint, typecheck, application tests, E2E, build и Docker checks не запускались: соответствующих приложений и конфигурации на Stage 0 нет. Успешная проверка документации не является проверкой будущего runtime.
 
 Stage 0 завершен в пределах документации. Предлагаемый commit: `docs: зафиксировать архитектуру и план разработки Finora`. Commit не выполнен. Следующий этап — Stage 1 — Foundation; он не начат.
+
+## 13.09.2026 — Stage 1: Foundation
+
+### Preflight и границы
+
+Использован Codex desktop: shell, apply_patch и официальные веб-источники для
+проверки версий. Подагенты не использовались. Перед изменениями полностью прочитаны
+все семь документов source of truth, включая Stage 1 roadmap. Общий вывод был
+обрезан, поэтому документы дочитаны диапазонами. `rg` отсутствует; использованы
+`find`, `sed` и стандартные средства. Повторное Discovery не проводилось.
+
+Рабочая директория — существующий проект Finora; `git status` показал чистое
+дерево. Ветка `main`, remote `origin` — `https://github.com/pw5rhn4tnn-dotcom/finora.git`.
+История: `bb3ff1a` — отдельная документация Stage 0, затем `15bff79` — `.gitignore`.
+Первый commit содержит ровно семь Markdown-документов, без application code.
+Тем самым условие истории выполнено до Stage 1; сообщение Stage 0 об отсутствии
+Git остается исторической записью, а не текущим blocker. Среди игнорируемых файлов
+обнаружен только существующий `.DS_Store`, он не изменялся.
+
+Реальный фрагмент текущего prompt пользователя:
+
+> Это Foundation, а не начало реализации продукта.
+
+Граница обеспечена составом файлов: только monorepo/tooling, минимальные приложения,
+smoke tests, описание api-client и текущий CI. Предметных модулей, финансовых данных,
+Prisma, Swagger-схемы, Docker, auth и предметных экранов не создавалось.
+
+### Версии и совместимость
+
+| Инструмент                              | Закрепленная версия                          |
+| --------------------------------------- | -------------------------------------------- |
+| Node.js LTS                             | 24.21.0, `.nvmrc` и точный `engines.node`    |
+| pnpm                                    | 12.4.1, `packageManager`, engines и lockfile |
+| React / React DOM                       | 19.3.0                                       |
+| Vite / React plugin                     | 8.3.0 / 6.1.1                                |
+| TypeScript                              | 6.0.3                                        |
+| NestJS common/core/platform-express     | 12.0.1                                       |
+| Nest CLI                                | 12.0.0                                       |
+| ESLint / @eslint/js / typescript-eslint | 10.10.0 / 10.0.1 / 8.70.0                    |
+| Prettier                                | 3.9.6                                        |
+| Frontend runner                         | Vitest 4.1.11                                |
+| Testing Library React / DOM             | 16.3.3 / 10.4.1                              |
+| jsdom                                   | 30.0.1                                       |
+| Backend runner                          | Встроенный `node:test` из Node.js 24.21.0    |
+| OpenAPI generator                       | Orval 8.33.0, выбран, пока не установлен     |
+
+Остальные прямые зависимости также exact: `@types/node` 24.13.4,
+`@types/react`/`@types/react-dom` 19.3.0, `reflect-metadata` 0.2.2, RxJS 7.8.2,
+`globals` 17.12.0, `eslint-plugin-react-hooks` 7.1.1 и
+`eslint-plugin-react-refresh` 0.5.6. Lockfile закрепляет транзитивный граф.
+
+До установки проверены npm metadata (`engines`, `peerDependencies`, optional peers)
+и официальный список Node releases. Node 24.21.0 — актуальный доступный LTS.
+Vite 8/plugin-react 6 требуют Node 20.19+ либо 22.12+, jsdom 30 — Node 24.15+
+в выбранной ветке; NestJS 12 требует Node 20+. ESLint 10 и typescript-eslint 8
+совместимы. TypeScript 7.0.2 из latest сознательно не выбран: typescript-eslint
+8.70.0 требует TypeScript `<6.1.0`; Nest CLI также использует ветку `~6.0.2`.
+React DOM 19.3 и Testing Library 16 поддерживают выбранный React 19.3.
+
+Источники: [Node releases](https://nodejs.org/dist/index.json),
+[Vite 8](https://vite.dev/blog/announcing-vite8),
+[TypeScript 6](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html),
+[npm: typescript-eslint](https://registry.npmjs.org/typescript-eslint/8.70.0),
+[npm: Vitest 4.1.11](https://registry.npmjs.org/vitest/4.1.11).
+
+### Runner, генератор и созданная основа
+
+Frontend: React монтирует минимальный русский placeholder. Vitest/Testing Library
+проверяют доступный заголовок и содержимое `main` в jsdom. Demo assets и предметные
+компоненты отсутствуют; Query providers, router и CSS framework не устанавливались.
+
+Backend: ESM/NodeNext, обычный `tsc` через Nest CLI, strict TypeScript с
+`experimentalDecorators`/`emitDecoratorMetadata`. Один корневой `AppModule` без
+предметных модулей и controllers. Общий `bootstrap` используется entrypoint и
+тестом. Сервер слушает loopback, тест использует порт 0, разрешает AppModule через
+Nest DI, делает настоящий HTTP-запрос с ожидаемым 404 и закрывает приложение.
+При ошибке listen ресурсы закрываются и ошибка пробрасывается; main пишет ошибку
+и выставляет ненулевой exit code. Технический endpoint для этого не понадобился.
+
+Окончательный backend runner — стабильный `node:test`. Перед запуском тестов
+исходники и тесты компилируются стандартным TypeScript в очищаемый `dist-test`.
+Это сохраняет metadata Nest и использует штатную загрузку ESM Node без отдельного
+трансформера. Nest testing utilities могут быть добавлены при реальной потребности;
+Foundation проверяет настоящий NestFactory непосредственно. Это не подмена будущих
+PostgreSQL integration тестов. [Node test runner](https://nodejs.org/docs/latest-v24.x/api/test.html).
+
+Выбран Orval 8.33.0: получает Nest-generated OpenAPI, генерирует TypeScript
+client/types, поддерживает Fetch и будущие React/TanStack Query hooks. Сравнены
+`openapi-typescript` 7.13.0 (прежде всего types, клиентный runtime выбирается отдельно)
+и `@hey-api/openapi-ts` 0.99.0 (подходящая альтернатива с плагинами). Orval напрямую
+покрывает принятую связку; добавлять генератор до реального контракта не требуется.
+`packages/api-client` содержит только private manifest и русское описание границы,
+без exports, DTO, fake contract и фиктивных scripts. На Stage 2 Orval именно этой
+версии будет установлен в пакет и lockfile; реальная Swagger-схема станет входом
+генерации, CI будет проверять воспроизводимость и рассинхронизацию. Цикл генерации
+пока не выполнен. [Orval Fetch](https://orval.dev/docs/guides/fetch-client/),
+[Orval TanStack Query](https://orval.dev/docs/guides/react-query/),
+[openapi-typescript](https://openapi-ts.dev/introduction),
+[Hey API](https://heyapi.dev/openapi-ts/get-started).
+
+Root scripts: `dev:web`, `dev:api`, `lint`, `format`, `format:check`, `typecheck`,
+`test`, `build`. ESLint проверяет TypeScript с type information; `strict` включен,
+`skipLibCheck: false`, необоснованных any/подавлений нет. Общие конфиги находятся в
+корне. Prettier не переписывает исходные PROJECT/DISCOVERY/AI_RULES и pnpm lockfile.
+Фактические команды и структура опубликованы в README. Архитектура уточнена по
+runner/generator/runtime и текущему Git, продуктовые решения не менялись.
+
+### Возникшие проблемы и исправления
+
+- В shell был выбран Node 8.17.0/npm 6.13.4, команды pnpm/Corepack отсутствовали в
+  PATH. Обнаружены ранее установленные Node 24.18.0 и Corepack 0.35.0. Для проверки
+  актуального LTS официальный Node 24.21.0 скачан в `/private/tmp`, SHA-256 архива
+  сверена с официальным SHASUMS256. Corepack/pnpm и store также подготовлены во
+  временном каталоге. Глобальные установки, настройки shell, sudo и nvm default
+  не менялись. Временный pnpm launcher добавлен только в PATH проверочных команд,
+  чтобы рекурсивные root scripts могли найти `pnpm`.
+- Sandbox блокировал DNS registry; установка и запросы версий выполнены с сетевым
+  разрешением. У Python HTTPS не нашлась цепочка CA: использован HTTPS Node.js с
+  включенной проверкой TLS, без отключения certificate verification.
+- Новый pnpm 12 отклонил вспомогательный `--cache-dir`; параметр убран, store
+  передавался поддерживаемым `--store-dir`. Первая установка остановилась на
+  неразрешенных install scripts `@parcel/watcher` и `unrs-resolver`. Scripts были
+  прочитаны и точечно разрешены. После отказа от Jest обе зависимости исчезли из
+  lockfile, и временные allowBuilds удалены. В итоговом графе они не нужны.
+- Сначала попробованы Jest 30.5.1 + ts-jest 29.4.12: typecheck выявил несоответствие
+  Node16/CommonJS новым ESM-пакетам NestJS 12, а ts-jest — необходимость явного
+  rootDir для TypeScript 6. После уточнения NodeNext/rootDir Jest все равно не
+  загрузил ESM Nest. Выбран более простой стандартный node:test с tsc; Jest,
+  ts-jest, их конфиг и зависимости полностью удалены. ESM-поддержка Jest описана
+  как экспериментальная в [официальной документации](https://jestjs.io/docs/ecmascript-modules).
+- Vitest 5.0.0 не прошел проверку типов: отсутствующий `@vitest/expect` и экспорт
+  `MarkOptions` в опубликованных declarations. Вместо отключения проверки библиотек
+  закреплен Vitest 4.1.11, чей peer range включает Vite 8. Повторные frontend test,
+  typecheck и build прошли.
+- Первый настоящий backend smoke остановился на `listen EPERM` из-за sandbox.
+  После разрешения loopback listen тот же тест прошел, без mock HTTP или изменения
+  ожиданий. Первые неудачные команды не считаются успешными проверками.
+
+### Ход проверки
+
+На этом шаге успешно выполнены lint, typecheck, отдельные frontend/backend tests
+(по одному содержательному тесту), отдельные сборки frontend/backend. Проверки
+чистой установки, dev-команд, полного root pipeline и отдельный self-review
+продолжаются; финальные результаты будут записаны ниже после фактического запуска.
+
+### Итоговые проверки и воспроизводимость
+
+После удаления устаревших allowBuilds запуск `pnpm format` попытался автоматически
+переустановить зависимости: pnpm 12 по умолчанию выполняет install при изменении
+конфигурации, причем без ранее переданного CLI-пути store. Попытка в sandbox
+остановлена после DNS-ошибок. Настроено `verifyDepsBeforeRun: error`: проверочные
+scripts больше не выполняют неявный reinstall. Установка запущена явно и успешно,
+временный store выбран переменной только в проверочной среде. Последующие команды
+format и format:check прошли.
+
+Создана отдельная копия только Git-visible исходников (35 файлов) в новом каталоге
+`/private/tmp`. В ней отсутствовали `.git`, `node_modules`, `dist`, `dist-test`,
+`.env` и посторонние файлы. Использован отдельный новый пустой pnpm store:
+`pnpm install --frozen-lockfile` загрузил 416 пакетов, `reused 0`, завершился с
+кодом 0. Затем в этой же копии последовательно выполнен весь набор команд CI.
+SHA-256 `pnpm-lock.yaml` до и после установки/проверок совпал. Рабочая среда проекта
+ради clean install не удалялась. Проверка проведена на macOS arm64; Linux runner
+GitHub будет проверен первым remote run.
+
+| Команда / проверка                                                | Фактический результат                                                            |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`                                  | Успех в рабочем каталоге и в чистой копии с пустым store; lockfile неизменен     |
+| `pnpm lint`                                                       | Успех, без warnings; повторно в чистой копии                                     |
+| `pnpm format`                                                     | Успех; отформатированы изменяемые файлы                                          |
+| `pnpm format:check`                                               | Успех в чистой копии                                                             |
+| `pnpm typecheck`                                                  | Успех для обоих приложений, тестов и конфигов; повторно в чистой копии           |
+| `pnpm --filter @finora/web test`                                  | Успех: 1 компонентный smoke test                                                 |
+| `pnpm --filter @finora/api test`                                  | Успех: 1 настоящий Nest HTTP bootstrap test                                      |
+| `pnpm test`                                                       | Успех: все 2 теста, также в чистой копии                                         |
+| `pnpm --filter @finora/web build`                                 | Успех: frontend production bundle                                                |
+| `pnpm --filter @finora/api build`                                 | Успех: исполняемый ESM backend                                                   |
+| `pnpm build`                                                      | Успех: обе сборки, также в чистой копии                                          |
+| `pnpm dev:web`                                                    | Успех: Vite на 127.0.0.1:5173, HTTP 200 и HTML Finora                            |
+| `pnpm dev:api`                                                    | Успех: Nest watch, HTTP 404 на 127.0.0.1:3000                                    |
+| `pnpm --filter @finora/api start`                                 | Успех: собранный backend отвечает HTTP 404                                       |
+| `pnpm list -r --depth 0` и проверка manifests/scripts             | Успех: root и 3 workspace-пакета, 25 прямых dependency declarations, все private |
+| `git diff --check`, status/diff, проверка состава файлов и hashes | Успех; исходные PROJECT/DISCOVERY/AI_RULES побайтно неизменны                    |
+
+Dev-серверы и собранный backend после smoke-проверки остановлены. HTTP 404 означает
+отсутствие маршрутов, а не готовность будущего API. Два теста — минимальный набор
+Foundation; минимум и целевое покрытие полного продукта остаются требованиями
+последующих этапов, не объявляются достигнутыми.
+
+### CI и отдельный self-review
+
+Создан `.github/workflows/ci.yml`: push/pull_request, только `contents: read`,
+Node из `.nvmrc`, pnpm из `packageManager`, frozen install, lint, format check,
+typecheck, tests, build. Проверены актуальные major-версии официальных Actions:
+[checkout v7](https://github.com/actions/checkout),
+[setup-node v7](https://github.com/actions/setup-node),
+[pnpm/action-setup v6](https://github.com/pnpm/action-setup).
+Конфигурация проверена чтением и Prettier; все ее shell-команды успешно выполнены
+локально в чистой копии. GitHub runner фактически не запускался.
+**Remote CI — pending verification**, поскольку commit/push запрещены заданием.
+
+Отдельно перечитаны исходники, конфиги, manifests, CI и diff документации.
+Проверены scope, границы packages, scripts и отсутствие прежних Jest-зависимостей
+в lockfile. Strict не отключен, подавления и фиктивные assertions отсутствуют.
+Новых предметных модулей/экранов, Prisma/Docker/auth, fake API и преждевременных
+абстракций нет. Каждый прямой пакет используется runtime, компилятором, lint,
+тестами или dev/build tooling; peer conflicts при чистой установке отсутствуют.
+У api-client сознательно нет кода и искусственных успешных scripts.
+
+Проверены Git-visible файлы на случайные artifacts, `.env`, приватные ключи и
+типичные token patterns, а каталоги исходников — на nested `.git`: проблем не
+обнаружено. `node_modules`, `dist`, `dist-test` и существующий `.DS_Store`
+игнорируются. В Git 5 измененных существующих файлов и 27 новых файлов; commits
+и push не выполнялись. Смысловые изменения ARCHITECTURE касаются только Foundation
+и актуального Git; дополнительные изменения таблиц ARCHITECTURE/ROADMAP —
+форматирование Prettier. Содержание PROJECT/DISCOVERY/AI_RULES сохранено.
+
+Stage 1 локально готов. Единственная pending-проверка — remote GitHub Actions.
+Stage 2 не начат: БД, Docker runtime, health и реальный Swagger → client cycle
+остаются его запланированной областью, а не недоделками Foundation.
+Предлагаемый commit: `chore(foundation): создать monorepo и проверяемую основу Finora`.

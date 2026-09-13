@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-test/
+coverage/
+pnpm-lock.yaml
+# Исходные утвержденные документы и правила не переписываются на Stage 1.
+PROJECT.md
+DISCOVERY.md
+AI_RULES.md

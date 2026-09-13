@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+engineStrict: true
+strictPeerDependencies: true
+saveExact: true
+verifyDepsBeforeRun: error

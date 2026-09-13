@@ -1,33 +1,34 @@
-# macOS
+# Файлы macOS
 .DS_Store
 
-# Dependencies
+# Зависимости
 node_modules/
 .pnpm-store/
 
-# Build
+# Сборка
 dist/
 build/
 *.tsbuildinfo
 
-# Tests
+# Результаты тестов
+dist-test/
 coverage/
 playwright-report/
 test-results/
 
-# Environment
+# Переменные окружения
 .env
 .env.*
 !.env.example
 
-# Logs
+# Логи
 *.log
 npm-debug.log*
 pnpm-debug.log*
 
-# IDE
+# Настройки редакторов
 .idea/
 
-# Temporary files
+# Временные файлы
 *.tmp
 *.swp

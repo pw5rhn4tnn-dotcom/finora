@@ -1,0 +1,30 @@
+{
+  "name": "finora",
+  "private": true,
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": "24.21.0",
+    "pnpm": "12.4.1"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @finora/web dev",
+    "dev:api": "pnpm --filter @finora/api dev",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "build": "pnpm -r run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.4",
+    "eslint": "10.10.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.6",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
+  }
+}

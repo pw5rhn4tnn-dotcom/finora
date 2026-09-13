@@ -1,0 +1,38 @@
+name: Проверки Foundation
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    name: Установка и проверки Stage 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Получить исходники
+        uses: actions/checkout@v7
+      - name: Настроить Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Настроить pnpm из packageManager
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - name: Установить зависимости из lockfile
+        run: pnpm install --frozen-lockfile
+      - name: Проверить lint
+        run: pnpm lint
+      - name: Проверить форматирование
+        run: pnpm format:check
+      - name: Проверить типы
+        run: pnpm typecheck
+      - name: Запустить тесты
+        run: pnpm test
+      - name: Собрать приложения
+        run: pnpm build

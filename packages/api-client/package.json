@@ -1,0 +1,6 @@
+{
+  "name": "@finora/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Граница генерации frontend-клиента из реального OpenAPI-контракта NestJS."
+}
