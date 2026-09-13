@@ -1,126 +1,182 @@
 # Finora
 
-Finora — проект приложения для управления личными финансами. Продуктовые возможности
-описаны в [DISCOVERY.md](DISCOVERY.md) и пока не реализованы.
+Finora — приложение для управления личными финансами по [DISCOVERY.md](DISCOVERY.md).
+Stage 1 foundation сохранён; Stage 2 добавляет PostgreSQL/Prisma, миграции, богатый
+seed и Docker runtime. **Stage 2 локально завершён**, проверки записаны в REPORT. Сейчас UI показывает «Приложение в разработке», API содержит
+только инфраструктурные endpoints. Авторизации, финансового CRUD и dashboard ещё нет.
 
-**Статус: Stage 1 — Foundation локально готов.** Созданы pnpm
-monorepo, минимальные React/Vite и NestJS приложения, строгая проверка TypeScript,
-реальные smoke tests и workflow GitHub Actions. Удаленный CI еще не запускался.
+## Запуск с чистого checkout
 
-## Требования для текущей разработки
-
-- Node.js **24.21.0 LTS** — точная версия в `.nvmrc` и `package.json`.
-- pnpm **12.4.1** — закреплен в `packageManager`; команда `pnpm` должна быть в `PATH`.
-- Git и доступ к npm registry для первоначальной установки.
-
-При использовании nvm выполните `nvm install` и `nvm use` из корня проекта.
-Если pnpm предоставляется уже установленным Corepack, его shim должен быть включен
-и доступен как `pnpm`; Corepack выберет версию из `packageManager`.
-Проверить окружение: `node --version` и `pnpm --version`.
-
-## Установка
-
+Нужны Git, работающий Docker Desktop/Engine с Docker Compose и доступ к registries.
+Локальные Node/pnpm, `.env` и ручные migrations/seed для этого запуска не нужны.
 Из корня репозитория:
 
 ```bash
-pnpm install --frozen-lockfile
+docker compose up
 ```
 
-Все прямые зависимости закреплены точными версиями. `pnpm-workspace.yaml` включает
-строгие проверки engines/peer dependencies. В итоговом графе нет зависимостей,
-требующих разрешения install scripts. `verifyDepsBeforeRun: error` запрещает
-автоматическую переустановку при запуске проверок: после изменения зависимостей
-сначала явно выполните установку.
+При первом запуске Compose сам собирает отсутствующие Web/API images. Дождитесь
+готовности API и Web. Адреса по умолчанию:
 
-Для текущего режима БД, Docker и `.env` не требуются. Это локальная разработка
-Foundation; будущий запуск всего продукта через Docker Compose еще не реализован.
+- [Web](http://localhost:8080) — минимальный UI Stage 1;
+- [Swagger UI](http://localhost:8080/docs);
+- [OpenAPI JSON](http://localhost:8080/docs/openapi.json);
+- [Liveness](http://localhost:8080/health/live);
+- [Readiness PostgreSQL](http://localhost:8080/health/ready).
 
-## Разработка
+API имеет prefix `/api/v1`; `/health/*` и `/docs` вынесены из него. Предметных
+маршрутов пока нет: `/api/v1/transactions` возвращает реальный 404 Problem Details.
+Nginx раздаёт production frontend и проксирует API/Swagger/health через один origin.
 
-В двух терминалах из корня:
+Startup: PostgreSQL healthcheck → проверка реального SQL-подключения →
+`prisma migrate deploy` → runtime permissions → атомарный seed → Nest/Prisma →
+API healthcheck → Web. Ошибка migration/seed останавливает API с ненулевым кодом.
+Случайного sleep нет; отдельный preflight делает до 30 ограниченных SQL-попыток.
+
+Остановка — Ctrl+C, затем при необходимости:
 
 ```bash
-pnpm dev:web
+docker compose down
 ```
+
+Volume сохраняется. Следующий `docker compose up` проверяет migrations и пропускает
+уже загруженный seed, сохраняя пользовательские изменения. После изменения исходников
+пересоберите images через `docker compose up --build`; для первого запуска `--build`
+не обязателен. **Полный сброс demo-БД с удалением её данных:**
+
+```bash
+docker compose down -v
+docker compose up
+```
+
+Порты Web 8080 и PostgreSQL 5432 должны быть свободны. Их можно изменить через
+`WEB_PORT` и `POSTGRES_PORT` в необязательном `.env` из [.env.example](.env.example).
+API наружу отдельно не опубликован. PostgreSQL опубликована только на loopback
+для локальной разработки. Все пароли в примере — публичные локальные demo defaults.
+Это учебный HTTP stack, не конфигурация публичного production hosting.
+
+## Demo dataset
+
+Два независимых профиля; общей семейной учётной записи или сущностей accounts нет.
+Пароли реально записаны как Argon2id hashes, но вход появится только на Stage 4.
+
+| Профиль                  | Email                   | Публичный demo-пароль | Операции |
+| ------------------------ | ----------------------- | --------------------- | -------- |
+| Алексей · личные финансы | personal@finora.example | Finora-Personal-2026! | 120      |
+| Мария · семейный бюджет  | family@finora.example   | Finora-Family-2026!   | 168      |
+
+Всего: **288 transactions, 16 categories, 16 budgets, 6 recurring rules,
+364 audit entries**, 2 пользователя, валюты RUB/USD/EUR. Шесть месяцев с доходами,
+расходами, near/over budgets, высоким/низким savings rate и месячной динамикой.
+Сохранены snapshot-курсы, recurring salary/rent/subscriptions и читаемые audit diffs.
+Нет работающего scheduler, CSV import или analytics API.
+
+Первая загрузка выбирает текущий UTC-месяц как последний месяц истории. Опора
+сохраняется в seed-записи и не меняется при restart. Для точной воспроизводимости
+укажите `SEED_ANCHOR_DATE=2026-09-01`: история охватывает апрель–сентябрь 2026.
+Изменение переменной после загрузки не перемещает существующие данные.
+
+Seed выполняется один раз атомарно под PostgreSQL advisory lock. Последующие запуски
+не создают дублей, не перетирают edits и не восстанавливают удалённые операции.
+Подробная карта schema → discovery, денежные диапазоны и стратегия seed находятся в
+[apps/api/prisma/README.md](apps/api/prisma/README.md).
+
+## Разработка вне Docker
+
+Нужны Node.js **24.21.0** (`.nvmrc`), pnpm **12.4.1** (`packageManager`) и PostgreSQL.
+При nvm выполните `nvm install` и `nvm use`; pnpm должен быть в PATH. Foundation
+версии сохранены; все прямые Stage 2 зависимости exact, lockfile зафиксирован.
+
+```bash
+pnpm install --frozen-lockfile
+cp .env.example .env
+set -a
+. ./.env
+set +a
+docker compose up -d --wait postgres
+pnpm db:setup
+```
+
+`set -a`/source предназначены для sh/bash/zsh. Compose читает `.env` самостоятельно;
+pnpm-команды получают его через окружение shell. Не перезаписывайте существующий
+`.env` командой `cp`: она показана для чистого checkout.
+
+Установка автоматически выполняет Prisma generate. `db:setup` применяет migration,
+выдаёт runtime-права и запускает seed. Runtime и migration URLs различны. Локальные
+привилегированные credentials нужны только setup/tests, не frontend.
+
+В двух терминалах (с загруженным окружением для API):
 
 ```bash
 pnpm dev:api
 ```
 
-Frontend: [http://127.0.0.1:5173](http://127.0.0.1:5173), только заголовок Finora
-и сообщение «Приложение в разработке». Порт Vite фиксирован: занятый порт вызывает
-ошибку, а не незаметное переключение на другой.
-
-Backend слушает `127.0.0.1:3000`; маршрутов пока нет, HTTP-запрос возвращает 404.
-Это ожидаемое состояние, не health endpoint и не предметный API.
-После сборки API запускается через `pnpm --filter @finora/api start`.
-Оба dev-процесса отслеживают изменения исходников; остановка — Ctrl+C.
-
-## Команды проверок
-
-| Команда                           | Назначение                                                                  |
-| --------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm lint`                       | ESLint для кода обоих приложений и конфигов; предупреждения запрещены       |
-| `pnpm format`                     | Форматирование изменяемых файлов через Prettier                             |
-| `pnpm format:check`               | Проверка форматирования без записи                                          |
-| `pnpm typecheck`                  | Strict TypeScript обоих приложений, включая тесты и Vite config             |
-| `pnpm test`                       | Все текущие тесты frontend/backend                                          |
-| `pnpm build`                      | Сборка обоих приложений                                                     |
-| `pnpm --filter @finora/web test`  | Компонентный smoke через Vitest и Testing Library                           |
-| `pnpm --filter @finora/api test`  | Компиляция тестов через tsc и настоящий Nest HTTP bootstrap через node:test |
-| `pnpm --filter @finora/web build` | Проверка типов и сборка Vite                                                |
-| `pnpm --filter @finora/api build` | Сборка Nest CLI через tsc                                                   |
-
-Исходные `PROJECT.md`, `DISCOVERY.md` и `AI_RULES.md` исключены из автоматического
-форматирования, чтобы сохранить утвержденные источники. Lockfile форматирует pnpm.
-Сборки `dist`, `dist-test` и зависимости игнорируются Git и проверками исходников.
-
-Тест frontend монтирует настоящий React-компонент в jsdom и проверяет содержимое.
-Backend test запускает тот же bootstrap, что `main.ts`, на свободном loopback-порту,
-проверяет разрешение `AppModule` через Nest DI и HTTP 404, затем закрывает приложение.
-Тестовая сборка каждый раз очищается. Тесты не требуют работающего dev-сервера.
-Проверки с настоящей PostgreSQL и Playwright относятся к последующим этапам.
-
-## Структура
-
-```text
-apps/
-  web/                 # React, Vite, компонентный smoke test
-  api/                 # NestJS bootstrap и его HTTP smoke test
-packages/
-  api-client/          # Только manifest и описание границы генерации
-.github/workflows/
-  ci.yml               # Проверки Foundation
+```bash
+pnpm dev:web
 ```
 
-Общие TypeScript/ESLint/Prettier конфиги находятся в корне. У `@finora/api-client`
-нет исходников, exports и фиктивных test/build scripts, поэтому рекурсивные
-команды выполняют проверки приложений, а Prettier проверяет документы пакета.
+API: `127.0.0.1:3000`; Vite: [127.0.0.1:5173](http://127.0.0.1:5173), с proxy
+`/api/v1`, `/docs`, `/health`. Порт Vite фиксирован. После build API можно запустить
+через `pnpm --filter @finora/api start`. Остановка — Ctrl+C; после работы остановите
+свой Compose stack через `docker compose down`.
 
-## Контракты, API и инфраструктура
+## Проверки
 
-Выбран **Orval 8.33.0**, сейчас он не установлен: нет реальной OpenAPI-схемы для
-генерации. Граница и порядок подключения зафиксированы в
-[packages/api-client/README.md](packages/api-client/README.md).
+После подготовки PostgreSQL и загрузки переменных окружения:
 
-Swagger UI, generated API client, PostgreSQL, Prisma, Docker Compose, Nginx,
-authentication и demo-аккаунты пока отсутствуют. Адреса `/api/v1`, `/docs` и
-health endpoints из архитектуры описывают будущую реализацию.
+```bash
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm db:validate
+pnpm api:check
+pnpm test:docker
+```
+
+| Команда             | Назначение                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm db:generate`  | Сгенерировать Prisma client из schema                                                  |
+| `pnpm db:validate`  | Проверить Prisma schema                                                                |
+| `pnpm db:migrate`   | Применить сохранённые migrations через migrate deploy                                  |
+| `pnpm db:seed`      | Собрать и выполнить идемпотентный seed                                                 |
+| `pnpm db:setup`     | Migrate → runtime permissions → seed для local dev                                     |
+| `pnpm api:generate` | Экспортировать реальный Swagger-контракт и пересоздать Orval client                    |
+| `pnpm api:check`    | Проверить отсутствие изменений после повторной генерации                               |
+| `pnpm test:docker`  | Clean-source Compose builds, migrations/seed, HTTP, outage/recovery, restart и cleanup |
+| `pnpm format`       | Отформатировать изменяемые исходники/документы                                         |
+
+`pnpm test` сохраняет Stage 1 frontend/Nest smoke и запускает real PostgreSQL
+integration. Тесты сами создают отдельные `finora_test_*` databases, применяют baseline
+и удаляют их после проверки. `MIGRATION_DATABASE_URL` должен указывать на локальную
+или CI PostgreSQL с правом CREATE DATABASE/ROLE. Demo database не очищается тестами.
+Без PostgreSQL suite завершается ошибкой; silent skip или SQLite substitute нет.
+
+`test:docker` требует Git, Node и Docker для самого runner, но **не устанавливает
+host dependencies для приложений**: делает временную копию Git-visible исходников,
+поднимает отдельный Compose project на свободных портах без `--build` и `.env`,
+проверяет все сервисы, повторный seed и сохранность полного dataset. В finally
+останавливает свои containers и удаляет свой volume. Основной developer volume
+не затрагивается. Первый прогон требует загрузки images и npm packages.
+
+Prisma-generated client/builds/node_modules игнорируются Git. Реальный OpenAPI JSON
+и Orval-generated source хранятся в Git и проверяются воспроизводимой генерацией.
+PROJECT/DISCOVERY/AI_RULES исключены из автоматического форматирования.
 
 ## CI
 
-Workflow запускается на `push` и `pull_request`: checkout → Node → pnpm →
-`pnpm install --frozen-lockfile` → lint → format check → typecheck → tests → build.
-Используются те же команды, что локально. PostgreSQL/Docker jobs отсутствуют.
-**Remote run: pending verification** — commit/push в рамках Stage 1 не выполняются.
+GitHub Actions имеет два jobs. Первый использует PostgreSQL service и выполняет
+frozen install, schema validation, lint, format, strict typecheck, smoke/integration,
+build и проверку OpenAPI generation. Второй выполняет clean/repeated Docker acceptance,
+включая build обоих images. Тестовые данные воспроизводимы, developer machine не нужна.
+
+**Remote GitHub Actions: pending verification after commit/push.**
 
 ## Документация
 
-| Документ                           | Назначение                                         |
-| ---------------------------------- | -------------------------------------------------- |
-| [PROJECT.md](PROJECT.md)           | Исходное обязательное задание                      |
-| [DISCOVERY.md](DISCOVERY.md)       | Утвержденная спецификация Finora v1.0              |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Техническая архитектура и решения Foundation       |
-| [AI_RULES.md](AI_RULES.md)         | Правила работы coding-agent                        |
-| [ROADMAP.md](ROADMAP.md)           | Границы этапов и критерии готовности               |
-| [REPORT.md](REPORT.md)             | Фактические версии, проблемы и результаты проверок |
+[PROJECT.md](PROJECT.md) — исходное задание; [DISCOVERY.md](DISCOVERY.md) — каноническая
+спецификация; [AI_RULES.md](AI_RULES.md) — правила разработки;
+[ARCHITECTURE.md](ARCHITECTURE.md) — архитектура;
+[ROADMAP.md](ROADMAP.md) — этапы; [REPORT.md](REPORT.md) — реальные проверки и проблемы.

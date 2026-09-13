@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0 зафиксирован в Git; Stage 1 — Foundation локально готов, обязательные локальные проверки пройдены. Remote CI — pending verification. Stage 2–12 не начаты. Это порядок будущих работ, фактическая история находится в [REPORT.md](REPORT.md). Продуктовые правила и приемка — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), механизмы реализации — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0 зафиксирован в Git; Stage 1 — Foundation локально готов, обязательные локальные проверки пройдены. Remote CI — pending verification. Stage 2 — Database & Docker Foundation локально завершён, обязательные проверки пройдены; Stage 3–12 не начаты. Это порядок будущих работ, фактическая история находится в [REPORT.md](REPORT.md). Продуктовые правила и приемка — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), механизмы реализации — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -42,9 +42,9 @@
 
 **Цель:** рано доказать запуск трех сервисов одной командой и закрепить модель хранения.
 
-**Входит:** Prisma schema для утвержденных сущностей, SQL constraints/indexes, миграции, decimal/date/timestamp conventions, минимальный идемпотентный seed и его механизм расширения; права runtime/миграций; HealthModule; production builds и Nginx proxy; Compose `web/api/postgres`, volumes, healthchecks, startup migrations → seed → API; логи/ошибки базовой инфраструктуры; Swagger и генерация клиента на реальном начальном контракте; PostgreSQL integration и Docker build в CI.
+**Входит:** Prisma schema для утвержденных сущностей, SQL constraints/indexes, миграции, decimal/date/timestamp conventions, богатый детерминированный идемпотентный seed (уточнение текущего задания Stage 2), его атомарность и сохранение пользовательских изменений; права runtime/миграций; HealthModule; production builds и Nginx proxy; Compose `web/api/postgres`, volumes, healthchecks, startup migrations → seed → API; логи/ошибки базовой инфраструктуры; Swagger и генерация клиента на реальном начальном контракте; PostgreSQL integration и Docker build в CI.
 
-**Не входит:** завершенные финансовые сценарии и богатый demo-набор, пользовательская авторизация, дизайн приложения, CRUD API финансов, scheduler и CSV. Таблицы будущих модулей создаются как основа constraints; их продуктовая логика не реализуется.
+**Не входит:** завершенные финансовые сценарии приложения, пользовательская авторизация, дизайн приложения, CRUD API финансов, scheduler и CSV. Таблицы будущих модулей создаются как основа constraints; их продуктовая логика не реализуется.
 
 **Зависимости:** Stage 1.
 

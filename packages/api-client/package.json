@@ -2,5 +2,16 @@
   "name": "@finora/api-client",
   "version": "0.0.0",
   "private": true,
-  "description": "Граница генерации frontend-клиента из реального OpenAPI-контракта NestJS."
+  "description": "Граница генерации frontend-клиента из реального OpenAPI-контракта NestJS.",
+  "type": "module",
+  "exports": {
+    ".": "./src/generated.ts"
+  },
+  "scripts": {
+    "generate": "orval --config orval.config.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "orval": "8.33.0"
+  }
 }

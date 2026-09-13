@@ -14,7 +14,16 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
-    "build": "pnpm -r run build"
+    "build": "pnpm -r run build",
+    "db:generate": "pnpm --filter @finora/api db:generate",
+    "db:validate": "pnpm --filter @finora/api db:validate",
+    "db:migrate": "pnpm --filter @finora/api db:migrate",
+    "db:seed": "pnpm --filter @finora/api db:seed",
+    "api:generate": "pnpm --filter @finora/api build && pnpm --filter @finora/api openapi:export && pnpm --filter @finora/api-client generate",
+    "api:check": "node scripts/check-api-generation.mjs",
+    "test:docker": "node scripts/test-docker.mjs",
+    "postinstall": "pnpm db:generate",
+    "db:setup": "pnpm db:migrate && pnpm --filter @finora/api db:permissions && pnpm db:seed"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

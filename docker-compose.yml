@@ -1,0 +1,61 @@
+name: finora
+services:
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_USER: finora_migrator
+      POSTGRES_PASSWORD: finora_local_migrator
+      POSTGRES_DB: finora
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U finora_migrator -d finora']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      DATABASE_URL: postgresql://finora_runtime:finora_local_runtime@postgres:5432/finora
+      MIGRATION_DATABASE_URL: postgresql://finora_migrator:finora_local_migrator@postgres:5432/finora
+      SEED_ANCHOR_DATE: ${SEED_ANCHOR_DATE:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    init: true
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '127.0.0.1:${WEB_PORT:-8080}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1/']
+      interval: 3s
+      timeout: 3s
+      retries: 15
+volumes:
+  postgres_data:

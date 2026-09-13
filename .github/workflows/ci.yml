@@ -1,4 +1,4 @@
-name: Проверки Foundation
+name: Проверки Finora
 
 on:
   push:
@@ -9,9 +9,23 @@ permissions:
 
 jobs:
   foundation:
-    name: Установка и проверки Stage 1
+    name: Foundation и PostgreSQL
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: finora_migrator
+          POSTGRES_PASSWORD: finora_local_migrator
+          POSTGRES_DB: finora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finora_migrator -d finora"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      MIGRATION_DATABASE_URL: postgresql://finora_migrator:finora_local_migrator@127.0.0.1:5432/finora
     steps:
       - name: Получить исходники
         uses: actions/checkout@v7
@@ -24,15 +38,33 @@ jobs:
         uses: pnpm/action-setup@v6
         with:
           run_install: false
-      - name: Установить зависимости из lockfile
+      - name: Установить зависимости и сгенерировать Prisma client
         run: pnpm install --frozen-lockfile
+      - name: Проверить Prisma schema
+        run: pnpm db:validate
       - name: Проверить lint
         run: pnpm lint
       - name: Проверить форматирование
         run: pnpm format:check
       - name: Проверить типы
         run: pnpm typecheck
-      - name: Запустить тесты
+      - name: Запустить smoke и PostgreSQL integration tests
         run: pnpm test
       - name: Собрать приложения
         run: pnpm build
+      - name: Проверить воспроизводимость OpenAPI-клиента
+        run: pnpm api:check
+  docker:
+    name: Чистый и повторный Docker startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Получить исходники
+        uses: actions/checkout@v7
+      - name: Настроить Node.js для acceptance runner
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Проверить Compose builds, миграции, seed и HTTP
+        run: node scripts/test-docker.mjs

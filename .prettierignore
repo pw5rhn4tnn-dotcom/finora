@@ -7,3 +7,6 @@ pnpm-lock.yaml
 PROJECT.md
 DISCOVERY.md
 AI_RULES.md
+apps/api/src/generated/
+packages/api-client/src/generated.ts
+packages/api-client/openapi/finora.json

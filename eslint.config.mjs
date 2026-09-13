@@ -11,6 +11,8 @@ export default defineConfig(
     '**/dist/**',
     '**/dist-test/**',
     '**/coverage/**',
+    'apps/api/src/generated/**',
+    'packages/api-client/src/generated.ts',
   ]),
   js.configs.recommended,
   {

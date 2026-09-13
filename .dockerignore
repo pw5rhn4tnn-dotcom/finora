@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/dist-test
+**/coverage
+**/src/generated
+.git
+**/.env
+**/.env.*
+**/*.log
+**/.DS_Store
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+.codex
+.agents
+
+**/.npmrc

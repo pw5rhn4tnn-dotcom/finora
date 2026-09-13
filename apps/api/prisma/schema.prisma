@@ -1,0 +1,165 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionSource {
+  MANUAL
+  CSV
+  RECURRING
+}
+
+enum RecurringFrequency {
+  MONTHLY
+}
+
+enum AuditEntityType {
+  Transaction
+  Budget
+  Category
+  RecurringTransaction
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  ARCHIVE
+}
+
+model User {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  email                 String
+  passwordHash          String
+  displayName           String
+  baseCurrency          String
+  timeZone              String
+  themePreference       String
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(3)
+  categories            Category[]
+  transactions          Transaction[]
+  budgets               Budget[]
+  recurringTransactions RecurringTransaction[]
+  auditEntries          AuditEntry[]
+
+  @@map("users")
+}
+
+model Category {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  userId                String                 @db.Uuid
+  name                  String
+  type                  TransactionType
+  icon                  String
+  color                 String
+  archivedAt            DateTime?              @db.Timestamptz(3)
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(3)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transactions          Transaction[]
+  budgets               Budget[]
+  recurringTransactions RecurringTransaction[]
+
+  @@unique([userId, id])
+  @@map("categories")
+}
+
+model Transaction {
+  id                      String                @id @default(uuid()) @db.Uuid
+  userId                  String                @db.Uuid
+  categoryId              String                @db.Uuid
+  type                    TransactionType
+  amount                  Decimal               @db.Decimal(24, 8)
+  currency                String
+  exchangeRate            Decimal               @db.Decimal(24, 12)
+  amountInBaseCurrency    Decimal               @db.Decimal(24, 8)
+  description             String
+  transactionDate         DateTime              @db.Date
+  source                  TransactionSource
+  recurringTransactionId  String?               @db.Uuid
+  recurringOccurrenceDate DateTime?             @db.Date
+  createdAt               DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime              @updatedAt @db.Timestamptz(3)
+  user                    User                  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  category                Category              @relation(fields: [userId, categoryId], references: [userId, id], onDelete: Restrict, onUpdate: Restrict)
+  recurringTransaction    RecurringTransaction? @relation(fields: [userId, recurringTransactionId], references: [userId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([recurringTransactionId, recurringOccurrenceDate])
+  @@index([userId, transactionDate, id])
+  @@index([userId, categoryId, transactionDate])
+  @@index([userId, type, transactionDate])
+  @@index([userId, recurringTransactionId])
+  @@map("transactions")
+}
+
+model Budget {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  categoryId  String   @db.Uuid
+  year        Int
+  month       Int
+  limitAmount Decimal  @db.Decimal(24, 8)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  category    Category @relation(fields: [userId, categoryId], references: [userId, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([userId, categoryId, year, month])
+  @@index([userId, year, month])
+  @@map("budgets")
+}
+
+model RecurringTransaction {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @db.Uuid
+  categoryId         String             @db.Uuid
+  type               TransactionType
+  amount             Decimal            @db.Decimal(24, 8)
+  currency           String
+  exchangeRate       Decimal            @db.Decimal(24, 12)
+  description        String
+  frequency          RecurringFrequency
+  dayOfMonth         Int
+  startDate          DateTime           @db.Date
+  endDate            DateTime?          @db.Date
+  nextOccurrenceDate DateTime           @db.Date
+  archivedAt         DateTime?          @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  category           Category           @relation(fields: [userId, categoryId], references: [userId, id], onDelete: Restrict, onUpdate: Restrict)
+  transactions       Transaction[]
+
+  @@unique([userId, id])
+  @@index([userId, categoryId])
+  @@map("recurring_transactions")
+}
+
+model AuditEntry {
+  id         String          @id @default(uuid()) @db.Uuid
+  userId     String          @db.Uuid
+  entityType AuditEntityType
+  entityId   String          @db.Uuid
+  action     AuditAction
+  before     Json?           @db.JsonB
+  after      Json?           @db.JsonB
+  createdAt  DateTime        @default(now()) @db.Timestamptz(3)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, createdAt, id])
+  @@index([userId, entityType, entityId])
+  @@map("audit_entries")
+}

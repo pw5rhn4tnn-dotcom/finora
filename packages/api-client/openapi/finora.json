@@ -1,0 +1,130 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "healthLive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Проверка прошла успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Проверить работу процесса API",
+        "tags": [
+          "Инфраструктура"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "healthReady",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Проверка прошла успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "База данных недоступна",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Проверить доступность PostgreSQL",
+        "tags": [
+          "Инфраструктура"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Finora API",
+    "description": "Инфраструктурный контракт Finora. Предметные функции появятся на следующих этапах.",
+    "version": "0.2.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "ProblemDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Категория ошибки",
+            "example": "internal_error"
+          },
+          "title": {
+            "type": "string",
+            "description": "Краткое описание ошибки"
+          },
+          "status": {
+            "type": "number",
+            "description": "HTTP-статус"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Безопасное описание причины"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Ошибки полей"
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Идентификатор запроса"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "errors",
+          "traceId"
+        ]
+      },
+      "HealthDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ],
+            "description": "Состояние инфраструктуры"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  }
+}

@@ -280,3 +280,171 @@ Stage 1 локально готов. Единственная pending-прове
 Stage 2 не начат: БД, Docker runtime, health и реальный Swagger → client cycle
 остаются его запланированной областью, а не недоделками Foundation.
 Предлагаемый commit: `chore(foundation): создать monorepo и проверяемую основу Finora`.
+
+## 13.09.2026 — Stage 2: Database & Docker Foundation
+
+### Preflight и реализация
+
+Использован Codex desktop, shell/apply_patch, официальные Prisma/NestJS/npm metadata.
+Подагенты не использовались. Полностью прочитаны семь входных документов до изменений;
+обрезанный общий вывод дочитан отдельными диапазонами. Рабочее дерево было чистым,
+Stage 1 зафиксирован commit `b76f546`, Stage 0 предшествует application code.
+
+Текущий prompt явно требует богатый seed уже на Stage 2; он уточняет прежнюю границу
+ROADMAP с минимальным seed. Авторизация, предметный CRUD, scheduler, CSV и UI Stage 3+
+не добавляются. Исходные PROJECT/DISCOVERY/AI_RULES не меняются.
+
+Реальный фрагмент prompt: «Stage 2 должен оставить после себя не набор конфигурационных
+файлов, а воспроизводимую database/infrastructure foundation Finora». В результате
+проверяется реальный cold start из копии Git-visible исходников без host node_modules.
+
+Сопоставление всех моделей и ограничений с источниками записано в
+`apps/api/prisma/README.md`. Созданы шесть Prisma-моделей, baseline SQL migration,
+Decimal/date conventions, Nest Prisma lifecycle, health, русский Swagger, Problem
+Details и безопасные JSON request logs. Orval 8.33.0 генерирует Fetch client двух
+инфраструктурных endpoints. Новые предметные endpoints отсутствуют.
+
+### Промежуточные результаты и проблемы
+
+- Prisma/client/adapter-pg закреплены на стабильной 7.10.0. npm latest у Prisma
+  указывал 8.0.0-rc.14: release candidate не выбран. Swagger 12.0.1 совместим с Nest 12.
+  Foundation зависимости сохранены. pg 8.23.0 и @types/pg 8.23.1 закреплены lockfile.
+- Установка завершилась после явных allowBuilds для Prisma engines/preinstall и
+  esbuild; необязательный telemetry script @scarf/scarf отключён. pnpm сам добавил
+  age exceptions для уже согласованной Orval 8.33.0 и её пакетов; версии точные.
+  Автоматически добавленные placeholders allowBuilds первоначально дали YAML error,
+  затем исправлены. После этого install и Prisma generate прошли.
+- Импорт Orval defineConfig в TS тянул неполные declarations debug/picomatch/faker.
+  Конфиг переведён в обычный MJS declarative object, который читает сам Orval.
+  Generated TypeScript остаётся под strict typecheck, skipLibCheck не включался;
+  mock dependencies для исправления чужих declarations не устанавливались.
+- Docker Desktop был остановлен. Запущен установленный Desktop. Обычный public pull
+  завис в docker-credential-desktop. Для проверок использован отдельный временный
+  Docker config без credentials с тем же daemon и установленными CLI plugins;
+  настройки/credentials пользователя не менялись. Anonymous pull PostgreSQL успешен.
+- PostgreSQL integration успешно проверили пустую migration, повторный deploy,
+  параллельный/повторный seed, равенство двух пустых БД при фиксированной опоре,
+  money precision/overflow, FK/uniques/CHECK, runtime audit permissions, rollback,
+  содержательность budget/analytics fixtures и сохранение пользовательских edits.
+  Настоящий Nest HTTP bootstrap прошёл, включая DB outage: live 200, ready 503,
+  затем ready 200 после восстановления. Frontend smoke сохранён и прошёл.
+- Первый Compose build обоих приложений успешен, но startup API остановился:
+  pnpm verifyDepsBeforeRun заметил неполную workspace-структуру runtime image.
+  Исправление: pnpm deploy --prod формирует самостоятельный runtime, а startup
+  вызывает установленный Prisma CLI напрямую через Node. Политика проверок pnpm
+  в рабочем monorepo не ослабляется. Повторная Docker-приёмка продолжается.
+
+### Итоговые validation и отдельный self-review
+
+После исправления runtime упаковки clean-source acceptance прошёл. На отдельной
+чистой копии без `.env` и `node_modules` команда `docker compose up -d --wait`
+(без `--build`) сама собрала Web/API, создала новую PostgreSQL, применила migration,
+выдала права, загрузила seed и дождалась трёх healthy-сервисов. Проверены UI, deep
+link fallback, API live/ready, `/docs`, OpenAPI JSON и Swagger JS. Отсутствующий
+предметный endpoint возвращает 404, не фиктивные финансовые данные.
+
+После остановки PostgreSQL live остался 200, ready стал 503; после возврата БД
+готовность восстановилась. Выполнены seed ещё три раза и down/up с сохранённым
+volume. Полные отсортированные снимки всех шести таблиц совпали, а не только counts.
+Итоговый dataset SHA-256 при опоре 2026-09-01:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Acceptance runner завершает свой стек и удаляет свой volume в finally.
+
+Дополнительно обычный checkout поднят через `docker compose up -d --wait` без
+`.env` и без `--build`: стандартные localhost:8080, `/docs` и readiness подтверждены
+HTTP 200. Первичный HTTP-запрос был отправлен ещё до завершения асинхронной сборки
+и не подключился; после завершения wait проверка прошла. Это не засчитано как
+успешная первая HTTP-попытка. Root `db:setup`, dev API/Vite proxy и собранный API
+проверены отдельно. Первому dev listen помешал sandbox EPERM; после разрешения
+loopback listen те же команды прошли, без изменения приложения ради sandbox.
+
+Полный pipeline выполнен из чистой копии: frozen install, lint, format:check,
+typecheck, test, build, db:validate, api:check — exit 0. Первый clean install
+использовал общий content-addressable store: pnpm 12 не применил переданную
+npm_config_store_dir. Поэтому дополнительно создана ещё одна чистая копия и явно
+выполнен `pnpm --store-dir <новый-пустой-store> install --frozen-lockfile`:
+631 пакетов, reused 0, downloaded 631, exit 0. Один DNS retry typedoc восстановился
+автоматически. Lockfile до/после всех установок одинаков:
+`9b3fecfbb5795714116011e6d4ad743380a84bdac4eb62c2996857fbdb73602e`.
+
+| Реально выполненная команда/проверка                           | Результат                                                                                                  |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`                               | Успех в рабочем каталоге и clean copy                                                                      |
+| `pnpm --store-dir <пустой-store> install --frozen-lockfile`    | Успех, 631 downloads, 0 reuse, lockfile неизменен                                                          |
+| `pnpm lint`                                                    | Успех                                                                                                      |
+| `pnpm format`, `pnpm format:check`                             | Успех                                                                                                      |
+| `pnpm typecheck`                                               | Успех для API, Web и generated client                                                                      |
+| `pnpm test`                                                    | Успех: 13 PostgreSQL сценариев, Nest HTTP smoke, frontend smoke; node:test также считает родительский test |
+| `pnpm build`                                                   | Успех Web и API                                                                                            |
+| `pnpm db:generate`, `pnpm db:validate`                         | Prisma client создан, schema валидна                                                                       |
+| `prisma migrate diff --from-empty --to-schema ... --script`    | Создан настоящий migration baseline, дополнен SQL constraints                                              |
+| `pnpm db:setup`                                                | deploy → runtime permissions → seed успешны                                                                |
+| `prisma migrate deploy` на новых тестовых БД и повторно        | Успех, baseline воспроизводим                                                                              |
+| seed ×3, concurrent seed, две пустые БД при одной опоре        | Полные dataset snapshots совпадают; concurrency создаёт ровно один набор                                   |
+| Ошибка в середине первичного seed                              | Все созданные ранее строки откатились                                                                      |
+| Seed после edit/delete                                         | Пользовательское изменение сохранено, удалённая операция не восстановлена                                  |
+| Decimal, overflow/NaN, uniques, CHECK, FK, runtime permissions | Реальная PostgreSQL отклоняет недопустимые записи/действия                                                 |
+| `pnpm api:generate`, `pnpm api:check`                          | Swagger → Orval воспроизводим                                                                              |
+| `docker compose config --quiet`                                | Compose валиден                                                                                            |
+| `node scripts/test-docker.mjs`                                 | Web/API builds, empty DB, автоматический seed, HTTP, outage/recovery, repeated startup успешны             |
+| `docker compose up -d --wait` на стандартных портах            | Web/API/docs доступны, три сервиса healthy                                                                 |
+| `pnpm dev:api`, `pnpm dev:web`                                 | API readiness/docs и Vite UI/proxy HTTP 200; процессы остановлены                                          |
+| `pnpm --filter @finora/api start`                              | Собранный API и DB readiness HTTP 200; процесс остановлен                                                  |
+| Проверка runtime image                                         | USER node, Nest process не содержит MIGRATION_DATABASE_URL                                                 |
+| CI YAML + сравнение package metadata                           | Два корректных jobs; прежние прямые версии и metadata прежних packages не изменены                         |
+| `git status`, `git diff --check`, полный diff и source hashes  | Проверены состав изменений и неизменность canonical sources                                                |
+
+В self-review исправлены:
+
+- PostgreSQL считает numeric NaN больше обычных чисел: CHECK положительности явно
+  исключает NaN; добавлен реальный отрицательный тест.
+- В OpenAPI первоначально заявлялся application/json для ошибки readiness при
+  фактическом application/problem+json. Контракт исправлен, Orval regenerated,
+  HTTP/Swagger test проверяет совпадение media type.
+- Prettier менял автоматически экспортированный JSON. Generated OpenAPI, как
+  generated client, исключён из Prettier; воспроизводимость контролирует api:check.
+- Bootstrap smoke теперь освобождает fixture даже при ошибке bootstrap.
+- Test files запускаются последовательно, чтобы начальная cluster-wide runtime role
+  provisioning разных тестовых БД не конкурировала. Сам concurrent seed проверяется
+  явным Promise.all и отдельными Prisma clients.
+- В demo уточнено разнообразие: личный профиль имеет 6 бюджетов по 3 категориям,
+  семейный — 10 бюджетов по 5 категориям. Два audit UPDATE показывают реальное
+  изменение суммы/normalized amount и описания в одной DB transaction.
+
+Фактический dataset: 2 users, 16 categories, 288 transactions (120/168), 16 budgets
+(6/10), 6 recurring rules, 364 audit entries (326 CREATE, 38 UPDATE). Источники:
+204 MANUAL, 48 CSV, 36 RECURRING. При проверенной опоре 2026-09-01 даты:
+02.04.2026–26.09.2026, шесть содержательных месяцев. RUB/USD/EUR; правила каждого
+профиля — зарплата, аренда, музыкальная подписка. Будущий scheduler не реализован.
+
+Созданы `apps/api/prisma/*`, Prisma/Nest health/infrastructure, startup scripts,
+Dockerfiles, Compose, Nginx, `.dockerignore`, `.env.example`, real PostgreSQL tests,
+OpenAPI/Orval файлы и workspace acceptance/generation scripts. Обновлены README,
+ARCHITECTURE, ROADMAP и данный REPORT. CI дополнен PostgreSQL service и отдельным
+Docker acceptance job; remote runner в этой сессии не запускался.
+**Remote GitHub Actions: pending verification after commit/push.**
+
+Осознанные компромиссы: три локальных сервиса, публичные HTTP/demo credentials,
+привилегированная bootstrap/migration-роль и ограниченная runtime-роль. Prisma CLI
+остаётся в production dependency graph для migrate deploy и транзитивно приносит
+собственные React/TypeScript/Studio пакеты; это не frontend Finora или новые сервисы.
+Предметный каталог валют, validation DTO и transactional domain services относятся
+к будущим этапам. Здесь реализованы их schema/constraints и корректные fixtures.
+Seed Argon2id использует стабильные соли только для публичных demo-паролей.
+
+Источники технической сверки:
+[Prisma 7](https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7),
+[Nest Swagger](https://docs.nestjs.com/openapi/introduction),
+[npm Prisma 7.10.0](https://registry.npmjs.org/prisma/7.10.0),
+[npm Swagger 12.0.1](https://registry.npmjs.org/@nestjs/swagger/12.0.1).
+
+Финальный root pipeline после self-review снова завершился с exit 0 для каждой
+команды; последний Docker acceptance также прошёл с тем же dataset hash. Финальные
+Git status/diff/check просмотрены: 21 modified, 34 new, 0 deleted files. Canonical
+PROJECT/DISCOVERY/AI_RULES побайтно совпадают с HEAD, случайных artifacts и реальных
+secrets в Git-visible файлах не обнаружено. Commit/push и изменения Git history
+не выполнялись. Все созданные проверочные Compose environments остановлены, их
+volumes удалены; dev/start процессы завершены, docker ps не показывает работающих
+контейнеров. Stage 2 локально завершён; Stage 3+ не реализован.
+
+Предлагаемый commit: `feat(database): добавить PostgreSQL, Prisma и Docker-инфраструктуру`.

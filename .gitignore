@@ -32,3 +32,6 @@ pnpm-debug.log*
 # Временные файлы
 *.tmp
 *.swp
+
+# Prisma client воспроизводится из schema
+apps/api/src/generated/

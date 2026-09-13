@@ -5,19 +5,39 @@
   "type": "module",
   "scripts": {
     "dev": "nest start --watch",
-    "start": "node dist/main.js",
+    "start": "node dist/src/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"require('node:fs').rmSync('dist-test', { recursive: true, force: true })\" && tsc -p tsconfig.test.json && node --test \"dist-test/test/**/*.test.js\"",
-    "build": "nest build"
+    "test": "node -e \"require('node:fs').rmSync('dist-test', { recursive: true, force: true })\" && tsc -p tsconfig.test.json && node --test --test-concurrency=1 \"dist-test/test/**/*.test.js\"",
+    "build": "nest build",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsc -p tsconfig.build.json && node dist/prisma/seed.js",
+    "db:wait": "node scripts/wait-database.mjs",
+    "openapi:export": "node dist/src/infrastructure/export-openapi.js",
+    "db:permissions": "node scripts/grant-runtime.mjs"
   },
   "dependencies": {
     "@nestjs/common": "12.0.1",
     "@nestjs/core": "12.0.1",
     "@nestjs/platform-express": "12.0.1",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "@nestjs/swagger": "12.0.1",
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "pg": "8.23.0",
+    "prisma": "7.10.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "12.0.0"
-  }
+    "@nestjs/cli": "12.0.0",
+    "@types/pg": "8.23.1"
+  },
+  "files": [
+    "dist",
+    "prisma/schema.prisma",
+    "prisma/migrations",
+    "prisma.config.ts",
+    "scripts"
+  ]
 }
