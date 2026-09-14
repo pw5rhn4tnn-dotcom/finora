@@ -639,3 +639,68 @@ build с окончательным CSS — exit 0. Source integrity подтв�
 остановлен и удалён вместе со своим volume; dev/preview процессы остановлены.
 Ограничение осталось только для remote CI и не проведённых проверок на физических
 устройствах/screen reader; обязательные локальные проверки Stage 3 пройдены.
+
+## 2026-09-14 — исправление Docker acceptance в CI Stage 3
+
+Инструмент: Codex; использован навык diagnosing-bugs, без субагентов.
+Задача ограничена падением acceptance после остановки PostgreSQL. Stage 4 не начат.
+
+Корневая причина — `compose('start', '--wait', 'postgres')` в
+`scripts/test-docker.mjs` (строка 129 до исправления). Локальный Compose v5.2.0
+поддерживает этот флаг, а Compose v2.38.2 возвращает `unknown flag: --wait`.
+Версия v2.38.2 сверена с опубликованным
+[составом Ubuntu 24.04 runner](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md).
+Официальный бинарник этой версии установлен только во временный каталог;
+штатная установка Docker не изменена. На нём воспроизведены как минимальный
+вызов, так и падение полного исходного acceptance на той же команде.
+Readiness 503 и Prisma-ошибка после остановки БД — ожидаемая часть сценария.
+
+Восстановление теперь выполняет совместимый `docker compose start postgres`,
+получает ID контейнера через `compose ps -q postgres` и опрашивает
+`docker inspect --format '{{.State.Health.Status}}'` до `healthy`. Это реальный
+healthcheck `pg_isready` из Compose. Затем HTTP-опрос ожидает строго 200 от
+`/health/ready` до последующей общей проверки стека. Для каждого ожидания задан
+отдельный deadline 180 секунд через AbortSignal; отдельный inspect/HTTP-запрос
+ограничен 5 секундами. Интервал повторной проверки — 1 секунда только после
+неуспешного состояния, без фиксированного ожидания запуска. При ошибке выводятся
+название проверки, последнее состояние и причина, затем штатные логи и cleanup.
+
+Все прежние assertions сохранены: healthy/readiness 200 → PostgreSQL stopped /
+readiness 503 (liveness 200) → PostgreSQL healthy / readiness 200; seed ×3,
+288 транзакций, hash всех таблиц, HTTP/Swagger, down/up с сохранённым volume.
+Остальные вызовы Compose проверены по help v2.38.2 и реальным прогонам:
+`up -d --wait --wait-timeout`, `ps --format json`, `exec -T`, `logs --no-color`,
+`down -v --remove-orphans`, `port`, `stop`. Других несовместимых флагов не найдено.
+
+`.github/workflows/ci.yml` проверен: docker job использует `ubuntu-latest`,
+Node.js из `.nvmrc` и непосредственно `node scripts/test-docker.mjs`, без pnpm
+на хосте. Новые проверки используют только встроенные Node API и Docker CLI;
+изменение workflow и установка новой версии Compose в CI не требуются.
+
+Локальные проверки выполнены на Node.js 24.21.0, pnpm 12.4.1 и отдельной
+PostgreSQL `17.6-bookworm`, с `CI=true` для foundation suite:
+
+- `pnpm install --frozen-lockfile` — успешно, включая генерацию Prisma client;
+  первый sandbox-запуск не имел DNS-доступа, повтор с разрешённой сетью успешен.
+- `pnpm db:validate`, `pnpm lint`, `pnpm format:check`, `pnpm typecheck` — успешно.
+- `pnpm test` — 19 frontend tests; Nest HTTP smoke и 13 PostgreSQL scenarios
+  (node:test сообщает 15 passed, включая родительский тест), без skips/failures.
+- `pnpm build` — успешно, Web и API собраны.
+- Установка Chromium командой из workflow с `--with-deps` — успешно;
+  `pnpm test:e2e` — 15 passed, без повторов.
+- `pnpm api:check` — успешно, OpenAPI и generated client воспроизводимы.
+- Полный `node scripts/test-docker.mjs` — два независимых успешных прогона на
+  Compose v2.38.2 и один на штатном v5.2.0, включая сборки из чистой копии.
+  Во всех трёх сохранён SHA-256
+  `55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+- Отдельная временная проверка реальной функции ожидания: переход
+  `starting → healthy` успешен; постоянный `unhealthy` завершается ожидаемой
+  ошибкой с последним состоянием через 180008 мс, без подмены времени.
+- Итоговые `pnpm format:check` и `git diff --check` — успешно.
+
+Созданные тестовые контейнеры, сети и volumes удалены. Изменены только acceptance
+runner и этот отчёт по правилам ведения истории проекта. Workflow, lockfile,
+PROJECT.md, DISCOVERY.md и AI_RULES.md не изменены. Remote GitHub Actions с этим
+исправлением не запускался: commit и push запрещены пользователем.
+
+Предлагаемый commit: `fix(ci): исправить восстановление PostgreSQL в acceptance`.

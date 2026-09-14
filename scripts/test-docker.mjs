@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { setTimeout } from 'node:timers/promises';
 
 const exec = promisify(execFile);
 const checkout = await mkdtemp(join(tmpdir(), 'finora-compose-'));
@@ -23,6 +24,28 @@ async function compose(...args) {
     timeout: 1200000,
   });
   return result.stdout;
+}
+async function waitFor(description, probe, expected) {
+  const timeout = 180000;
+  const signal = AbortSignal.timeout(timeout);
+  let lastState = 'ещё не проверено';
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      lastState = await probe(signal);
+      signal.throwIfAborted();
+      if (lastState === expected) {
+        console.log(`${description}: ${lastState}`);
+        return;
+      }
+      await setTimeout(1000, undefined, { signal });
+    }
+  } catch (error) {
+    throw new Error(
+      `Не удалось дождаться ${description} (лимит ${timeout / 1000} с); последнее состояние: ${lastState}`,
+      { cause: error },
+    );
+  }
 }
 async function databaseHash() {
   const parts = [];
@@ -126,7 +149,38 @@ try {
   await compose('stop', 'postgres');
   assert.equal((await fetch(`${url}/health/live`)).status, 200);
   assert.equal((await fetch(`${url}/health/ready`)).status, 503);
-  await compose('start', '--wait', 'postgres');
+  // Compose v2 поддерживает --wait у up, но не у start.
+  await compose('start', 'postgres');
+  const postgres = (await compose('ps', '-q', 'postgres')).trim();
+  assert.notEqual(postgres, '', 'Контейнер PostgreSQL должен быть запущен');
+  await waitFor(
+    'PostgreSQL healthy',
+    async (signal) => {
+      const result = await exec(
+        'docker',
+        ['inspect', '--format', '{{.State.Health.Status}}', postgres],
+        { env, signal, timeout: 5000 },
+      );
+      return result.stdout.trim();
+    },
+    'healthy',
+  );
+  await waitFor(
+    '/health/ready HTTP 200 после восстановления PostgreSQL',
+    async (signal) => {
+      try {
+        const response = await fetch(`${url}/health/ready`, {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+        });
+        await response.body?.cancel();
+        return String(response.status);
+      } catch (error) {
+        signal.throwIfAborted();
+        return `${error.name}: ${error.message}`;
+      }
+    },
+    '200',
+  );
   await compose('up', '-d', '--wait', '--wait-timeout', '180');
   await verifyHttp();
   await compose('down');
