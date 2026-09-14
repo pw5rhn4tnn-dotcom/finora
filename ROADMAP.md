@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stages 0–6 завершены и опубликованы; по сообщению пользователя последний remote GitHub Actions после двух CI repair-pass — GREEN. Stage 7 завершён в своём scope: локальный CI-equivalent, Docker и Linux/non-root приёмка PASS; Stage 8–12 не начаты. Новый remote run для этих изменений не запускался. Локальный PASS не подменяет GitHub Actions. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stages 0–6 завершены и опубликованы; по сообщению пользователя последний remote GitHub Actions после двух CI repair-pass — GREEN. Stage 7 завершён, закоммичен (`1c683e1`) и опубликован; независимый acceptance-review подтвердил remote GitHub Actions на этом commit GREEN на GitHub-hosted Linux x86_64 (evidence — REPORT.md, раздел «Stage 7 — Remote CI / x86_64 Final Gate»). Stage 8–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -146,7 +146,7 @@ Docker clean/repeated startup, DB recovery и persistence после mutations �
 
 ## Stage 7 — Dashboard & Financial Insights
 
-**Статус:** завершён локально. Все обязательные проверки текущего scope PASS на macOS и Linux/non-root; stress — по 20 последовательных запусков без retries на каждой платформе. Commit/push и новый remote CI не выполнялись. Полная продуктовая приёмка ближайших регулярных операций остаётся в Stage 8. Доказательства и ограничения — REPORT.
+**Статус:** завершён и опубликован (`1c683e1`). Все обязательные проверки текущего scope PASS на macOS и Linux/non-root; stress — по 20 последовательных запусков без retries на каждой платформе, включая тот же прогон внутри подтверждённого remote CI. Remote GitHub Actions на этом commit — GREEN на Linux x86_64. Полная продуктовая приёмка ближайших регулярных операций остаётся в Stage 8. Доказательства и ограничения — REPORT.
 
 **Цель:** превратить историю операций в содержательную аналитику.
 

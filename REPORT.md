@@ -1832,3 +1832,80 @@ logout/login двух владельцев с поздним ответом, rel
 Stage 11 общая финальная приёмка всего продукта и Stage 12 deployment/demo.
 Базовая запись аудита прежних этапов сохранена. Commit, push, force, rebase,
 reset чужих изменений и новый remote CI не выполнялись.
+
+### Stage 7 — Remote CI / x86_64 Final Gate
+
+Независимый acceptance-review после того, как Stage 7 был закоммичен и опубликован.
+Локальный CI-equivalent и Docker acceptance выше не повторялись; ниже — только
+проверка фактического remote прогона и статичный анализ workflow/scripts/tests.
+
+**Commit:** `1c683e11690e08223c60d8b31dde3115b2f6c9a4` (`feat(дашборд): реализовать
+аналитику и завершить Stage 7`), ветка `main`, синхронизирована с `origin/main`.
+
+**Remote run:** `gh run list --commit 1c683e1...` вернул один прогон workflow
+«Проверки Finora» именно на этом SHA — `databaseId 34872194182`, `event: push`,
+`status: completed`, `conclusion: success`. Оба job («Foundation и PostgreSQL»,
+«Чистый и повторный Docker startup») завершились `success`; в каждом job все шаги
+`success`, включая шаг `Post ...` cleanup — отдельного диагностического run не
+потребовалось.
+
+**OS / architecture — фактическое доказательство, не только имя `ubuntu-latest`:**
+из полного лога run (`gh run view 34872194182 --log`):
+
+- `Set up job` в обоих job печатает `Image: ubuntu-24.04` со ссылкой на конкретный
+  релиз `actions/runner-images` (`ubuntu24/20260907.300`) — это реальные метаданные
+  образа GitHub-hosted runner, а не предположение по имени `runs-on`;
+- `Настроить Node.js` в обоих job показывает `Acquiring 24.21.0 - x64 from
+  .../node-24.21.0-linux-x64.tar.gz` — Node установлен именно как linux-x64 бинарник;
+- `pnpm install` качает нативные бинарники `@rolldown/binding-linux-x64-gnu`;
+- шаг установки Chromium работает с `apt`-репозиторием архитектуры `amd64`
+  (`noble-updates/main amd64 Packages`, `.../restricted amd64 Packages` и т.д.).
+
+Совокупность этих независимых источников (образ runner, бинарники Node, нативные
+пакеты pnpm, репозиторий apt) однозначно подтверждает **Linux x86_64 (amd64)**.
+Дополнительный diagnostic-commit с `uname -a`/`process.arch` не потребовался —
+второй run не запускался, второй SHA отсутствует.
+
+**Выполняемые remote gates (из `.github/workflows/ci.yml`, job `foundation`):**
+`pnpm install --frozen-lockfile` → `pnpm db:validate` → `pnpm lint` →
+`pnpm format:check` → `pnpm typecheck` → `pnpm test` (backend + frontend
+unit/integration через `pnpm -r run test`) → `pnpm build` → `playwright install
+--with-deps chromium` → `pnpm test:e2e` (shell/responsive/axe) → `pnpm api:check`
+(воспроизводимость OpenAPI/Orval) → `pnpm test:e2e:auth` (`node
+scripts/test-docker.mjs --browser`: чистый/повторный Compose startup, seed ×3,
+DB outage/recovery, finance/budget/dashboard acceptance, auth+finance/budgets/
+dashboard Playwright через Nginx, Stage 6 regression `check-stage6-e2e.mjs` и
+**Stage 7 20-прогонный stress `check-stage7-e2e.mjs`**). Job `docker` отдельно
+повторяет `node scripts/test-docker.mjs` для чистого/повторного Docker startup.
+Таким образом 20-run stress-suite Stage 7 уже реально выполнен внутри
+подтверждённого remote run — отдельный повторный локальный прогон не требуется.
+
+**Retries / skips / continue-on-error:** в `ci.yml` нет `continue-on-error` ни
+на одном обязательном шаге; единственный `--health-retries 30` — это readiness-
+проверка запуска контейнера PostgreSQL сервиса перед тестами, а не сокрытие
+падения теста. В `package.json` и во всех вызываемых `scripts/*.mjs` нет `|| true`,
+условного отключения тестов через переменные окружения и Linux-specific skip;
+`check-stage7-e2e.mjs` явно передаёт `--retries=0` на каждый из 20 прогонов.
+Diagnostic-artifact upload (`actions/upload-artifact`) выполняется только
+`if: failure()` и не влияет на итоговый статус job. Абсолютных host-путей,
+обхода frozen install или обхода generated API check в workflow нет.
+
+**Race/concurrency — deterministic regression coverage (проверено чтением кода,
+без повторного запуска):** ни в `apps/web/e2e/dashboard.compose.spec.ts`, ни в
+`apps/web/src/features/dashboard/dashboard.test.tsx` нет `setTimeout`/
+`waitForTimeout`/`sleep`-ожиданий для управления гонкой — все сценарии используют
+Playwright `route.fetch/route.fulfill` с ручными `resolve`-гейтами или
+`deferred()`-промисы в component tests. Подтверждено покрытие:
+stale/out-of-order ответов и rapid month switching (A→Б, январь→февраль→март,
+включая обратную доставку настоящих snapshot), pending GET → mutation → инвалидация
+(создание операции отменяет первый GET), поздняя ошибка не перекрывает новый успех,
+503 → retry → успех того же периода, logout/login другого владельца с задержанным
+старым Dashboard (Playwright) и с поздним ответом (component test), поздний
+отменённый 401 (`dashboard.test.tsx`, тест «поздний 503 и 401 предыдущего периода
+не перекрывает новый успех»), изоляция cache между владельцами (`finance` query
+keys очищаются, чужие данные не показываются), unmount/remount (тест «unmount/
+remount отменяет первую медленную загрузку»). Существующее покрытие признано
+достаточным; изменения в тесты не вносились.
+
+**Итоговый статус remote-CI/x86_64 gate: PASS.** Ложноположительных зелёных
+результатов не обнаружено.
