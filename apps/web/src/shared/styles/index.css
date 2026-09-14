@@ -4,6 +4,7 @@
 @import '../../app/shell.css';
 @import '../../pages/pages.css';
 @import '../../features/finance/finance.css';
+@import './dashboard.css';
 
 @layer base {
   html {

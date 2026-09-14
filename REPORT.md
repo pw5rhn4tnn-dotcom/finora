@@ -1567,3 +1567,268 @@ production/test коде. Между проходами создавались �
 Полные checks: `final-gates/`, `linux-gates.log`, `final-docker-acceptance.log`,
 `final-browser-acceptance.log`; matrix — `/private/tmp/finora-ci-matrix/`,
 Linux Stage 6 — `/private/tmp/finora-ci-stage6/result.log`.
+
+## Stage 7 — Dashboard & Insights, 2026-09-14
+
+Исходная точка: `680e6a5a9b484344b5d9e8d89c33c1cd5084bf48`, чистый working tree.
+Пользователь сообщил, что Stages 0–6 опубликованы и последний GitHub Actions
+после Stage 6 и двух repair-pass GREEN. Прежний заголовок ROADMAP ещё говорил
+об отсутствующем remote green; обновлён с явной атрибуцией пользователю.
+Remote run текущих изменений не запускался, commit/push запрещены заданием.
+
+До реализации изучены PROJECT, DISCOVERY, AI_RULES, ARCHITECTURE, ROADMAP,
+README, полный REPORT с двумя CI repair-pass, workspace/config, Prisma
+schema/migration/seed, backend auth/users/audit/categories/transactions/budgets,
+finance UI и cache lifecycle, Orval output, shell, regression/E2E, workflow и
+Docker acceptance. `rg` в окружении отсутствует; применялись find/grep и Python.
+Shell по умолчанию имел старый Node, поэтому команды запускаются с найденными
+Node 24.21.0 и pnpm 12.4.1. Доступ к Docker/localhost выполнялся через разрешённые
+sandbox escalation. Production данные не использовались.
+
+Реализованы DashboardModule, единый authenticated агрегированный endpoint,
+Decimal KPI/шесть месяцев/распределение/Top-5/бюджеты/детерминированные Insights,
+Orval и экран. Scope ROADMAP соблюдён: recurring только честное пустое состояние.
+Schema, migration, seed, runtime permissions и auth policy не менялись.
+Новых dependencies нет: два SVG с точными текстовыми данными вместо запланированной
+Recharts. Диапазон Dashboard 0001-06…9999-12 явно ограничивает полное шестимесячное
+окно; Stage 6 сохраняет прежний диапазон. Формулы и пороги — ARCHITECTURE §31.
+
+Общий минимальный fix: `moneyText('-0.1')` теперь сохраняет знак (`−0,10 RUB`).
+Финансовые query keys и cancel-before-invalidate Stage 5 переиспользуются.
+Dashboard дополнительно проверяет aborted signal после HTTP до обработки 401;
+это предотвращает side effect от опоздавшего ответа отменённого запроса.
+
+### Проверки до итогового self-review
+
+Первый API прогон выявил неверное ожидание теста: Prisma adapter не публикует
+служебный SET TRANSACTION в query events. Удалено это утверждение; изоляцию
+доказывает настоящий concurrent-write тест: запись обновляется между monthly SUM
+и category SUM, ответ сохраняет старые согласованные значения, следующий читает новые.
+На 10 000 операций число SELECT = 5; измеренные ранние чтения 36.5–74.7 мс,
+без time-based assertion. EXPLAIN показал агрегирование с существующим индексом
+owner/DATE; новый индекс без доказанной необходимости не добавлялся.
+
+Первая frontend ошибка касалась только сравнения NBSP в точной денежной строке.
+После исправления matcher полный прогон: backend 71/71, frontend 78/78,
+shell 15/15. Дальше добавлены ещё проверки, поэтому это промежуточные числа.
+TS/lint потребовали корректного импорта expect, совместимого с target deferred
+helper и отсутствия мутации переменной в JSX callback. Исправлено без новых пакетов
+или изменения конфигурации проверок.
+
+Первый production Dashboard suite: 11 PASS, 1 FAIL — содержимое при 768×1024
+и 200% root font выходило за ширину Dashboard. Применён `diagnosing-bugs`:
+падающий responsive case, screenshot и измерения DOM; проверены отдельно три
+гипотезы (grid columns, min-width заголовка, padding). Воспроизводимый seed probe
+дал clientWidth 192 и scrollWidth 290. Изменение только числа колонок на одну
+устранило внешний overflow; min-width и padding по отдельности — нет.
+Решение: Grid с auto-fit/minmax от доступной ширины, перенос текста, ограничение
+ширины декоративного SVG категории. Общая shell не переписывалась. Прежние
+assertions сохранены. Повторный полный suite 12/12 PASS, включая дефектный viewport.
+Диагностический harness находится вне repo; debug instrumentation в код не добавлена.
+
+### Self-review по двум осям
+
+Навык `code-review` использован для независимых read-only Standards и Spec
+проверок против исходного HEAD, включая untracked Stage 7 файлы. Пользовательский
+запрет commit/push означает review working tree, а не создание искусственного commit.
+
+Standards: hard breaches не обнаружены. Проверены owner predicates и composite
+category FK, RepeatableRead, SUM/Decimal, строгий query, signal/401, Stage 6 reuse,
+UI fallback и portable artifacts. SVG и нижний предел периода документированы.
+
+Spec: найдены четыре пробела проверки, без подтверждённого дефекта production
+расчётов: отсутствовал 640×320; stress повторял только два сценария; timezone
+проверялся на профиле, но не PostgreSQL session; retry не проверял успешное
+восстановление того же периода. Добавлены обязательный landscape, 503→retry→200
+в component и browser tests, реальные PostgreSQL sessions с Pacific/Kiritimati
+и America/Los_Angeles (оба PASS без production исправления), расширен critical
+путь logout/login другого владельца → navigation → resize. Также добавлена
+integration цепочка foreign-currency create→update суммы/даты→смена типа→delete
+с проверкой KPI и бюджета.
+
+Stress runner перезапускает только API явно указанного disposable Compose и ждёт
+healthy между запусками. Это даёт свежий in-memory auth limiter для настоящих
+повторных login; production policy не ослабляется. Сессии setup неизменяемы,
+каждый case имеет новый context и собственные записи с проверяемым finally cleanup.
+Runner допускает существующий Linux browser container, чтобы тот же набор шёл
+под non-root UID; Docker orchestration выполняется снаружи контейнера.
+
+### Использованный prompt и оценка AI
+
+Реальный prompt пользователя: «pending GET → mutation DELETE → invalidation →
+stale pending GET snapshot … ЭТОТ КЛАСС ОШИБОК НЕЛЬЗЯ ПОВТОРИТЬ» и требование
+искусственно обратного порядка ответов. Он привёл к проверкам, где Playwright
+сначала получает реальный ответ PostgreSQL через route.fetch, удерживает доставку,
+выполняет смену периода или создание операции и только затем освобождает старый
+snapshot. Component tests дополнительно проверяют отсутствие старого cache data.
+Это сильнее случайных задержек и одного green run. Self-review отдельно выявил,
+что первоначальный stress-filter был слишком узким: scope проверки исправлен,
+а ранний PASS не использован как доказательство полной готовности.
+
+Итоговые gates после последних исправлений записываются ниже по фактическим
+результатам; промежуточные PASS выше не заменяют финальную приёмку.
+
+### Последние найденные проблемы и окончательная проверка
+
+Первый полный Docker browser run обнаружил ошибку нового navigation regression:
+после перехода на «Бюджеты» и обратно тест немедленно заполнял одинаково названные
+поля месяца, не дождавшись смены страницы. Добавлены ожидания соответствующего h1
+перед следующим действием. Production код для этого не менялся; sleeps, retries,
+ослабление assertions и увеличение timeout не применялись. Затем исправлена
+грамматика текстов budget Insights и удалены неиспользуемые стили прежнего welcome
+экрана. Ниже приведены прогоны после последней правки production/test кода.
+
+Linux matrix сначала выявила два дефекта внешнего проверочного harness. Выбор всех
+Playwright projects вместе с `--no-deps` удалял outputDir setup, откуда runtime
+читал storageState: ENOENT, 44 failed. Указаны только нужные runtime projects.
+Следующий запуск дал 43 passed / 1 failed: четыре suite в одном процессе совершали
+11 настоящих login за минуту при production auth limit 10. Применён существующий
+подход acceptance runner: отдельный setup, затем auth+finance, затем budgets+dashboard,
+со свежим API limiter между группами. Security rate-limit checks используют свой
+изолированный Compose. Все сценарии внутри групп сохраняют параллельность, исходные
+assertions и retries=0. Это не доказательство единого процесса из 44 тестов:
+проверены две группы 19+25 при каждом workers 1/2/4. Внешний matrix harness находится
+в OS temp; production auth policy и прежние finance/budgets tests не ослаблены.
+
+Финальная Linux matrix: для каждого workers=1,2,4 — setup 2/2, auth+finance 19/19,
+budgets+dashboard 25/25. Всего **132 runtime cases + 6 setup, 0 failed**. Независимый
+повторный Spec review подтвердил устранение всех четырёх замечаний; новых actionable
+замечаний по Standards или Spec не осталось.
+
+На macOS arm64 и Linux arm64 (Docker Desktop, Debian, uid/gid 1000, node) выполнены:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm db:generate
+pnpm db:validate
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm api:generate
+pnpm api:check
+pnpm test:e2e
+```
+
+Все команды PASS на обеих платформах. Node 24.21.0, pnpm 12.4.1,
+Playwright 1.63.0 / Chromium 153. Backend **73/73**, frontend **79/79**,
+shell browser **15/15** на каждой платформе. Dashboard включает 12 backend
+и 12 component tests. PostgreSQL настоящий, временные integration DB удаляются.
+`api:check` подтвердил воспроизводимость обеих generated tracked файлов.
+
+Измерение Dashboard на 10 000 операций в последних integration runs: **SELECT=5**,
+101.3 мс macOS и 39.0 мс Linux при одновременной работе других acceptance jobs.
+Это наблюдения, не SLA и не сравнение скорости платформ. EXPLAIN использует
+`transactions_userId_transactionDate_id_idx`, GROUP BY выполняется в PostgreSQL.
+Сырые операции не возвращаются в Node/browser; число запросов не растёт с объёмом.
+Новые индексы, schema/migration и seed не потребовались. Seed HTTP response в отдельном
+измерении около 6.3 KB: 6 месяцев, 6 expense-категорий, 5 top, 3 бюджета, 3 Insights.
+
+`CI=1 pnpm test:e2e:auth` после последней очистки CSS — **PASS**. Runner строит
+production images из чистой копии текущих исходников, поднимает отдельный Compose,
+проверяет clean/repeated startup, seed ×3, health/readiness, DB outage/recovery,
+финансовый CRUD/архивирование/audit/ownership, budget acceptance и Dashboard
+сверку с SQL. Затем browser auth+finance 20/20 (включая setup), budgets 13/13
+(включая setup), Dashboard 14/14 (включая setup). Все обычные tests retries=0.
+Stage 6 regression harness подтвердил 5 намеренных worker failures с проверенным
+маркером, после них 6 успешных viewport scenarios/12 отдельных PNG; параллельный
+повтор — 12 успешных scenarios/24 PNG. Намеренные failures не являются падениями
+приёмки: harness проверяет ровно этот результат, каждый case имеет одну попытку.
+
+Финальный dataset SHA-256 после startup/seed/restart:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+GET Dashboard не меняет БД. Финансовые изменения и удаления сохраняются после
+restart и повторного seed; чужие операции/бюджеты/категории не входят в агрегаты.
+После выхода старый Dashboard response, включая поздний 401/503, не восстанавливает
+данные первого владельца и не сбрасывает новую сессию. Controlled month races,
+pending GET → create → cancel → refetch, retry, remount и cache isolation PASS.
+
+Полный Dashboard suite проверяет 320/390/640×320/768/1024/1440/1920, длинные названия,
+большие точные суммы, 200% текста, keyboard и axe. Проверены скриншоты desktop/mobile;
+текстовая таблица шести месяцев и список категорий доступны без чтения SVG.
+Реальные iOS/Android устройства и ручной screen reader не запускались.
+
+### Portability и пределы подтверждения
+
+Linux проверки выполнялись под uid=1000; `/private/tmp` внутри runner отсутствует.
+Frozen install, Prisma generation, build и browser runtime прошли в case-sensitive
+Linux filesystem. В изменённых исходниках и runtime scripts нет абсолютных host
+paths, предположений `/Users`, `/home/runner` или обязательного `/private/tmp`;
+временные файлы используют os.tmpdir/outputDir, PNG — testInfo.outputPath.
+Новые scripts не зависят от BSD/GNU sed, mktemp или конкретной архитектуры Node.
+Пути к локальному Node и Docker orchestration существуют только во внешних командах
+этой сессии. Dependencies, lockfile, Prisma schema/migrations/seed, Dockerfile и
+GitHub workflow не изменены. Контейнерные зависимости установлены frozen, не
+подменены отдельными пакетами host-системы.
+
+**Локальный CI-equivalent PASS; Linux/non-root PASS.** Проверен Linux arm64,
+не x86_64; настоящий GitHub-hosted Ubuntu Actions в этой сессии не запускался.
+Прежний remote GREEN — сообщение пользователя о baseline Stages 0–6. Он не относится
+к текущим изменениям Stage 7. Известные предупреждения pg adapter при bulk fixture
+и Vite bundle size не скрыты и не устранялись обновлением dependencies вне scope.
+
+Отдельный финальный Linux/non-root запуск `FINORA_COMPOSE_URL=http://web node
+scripts/check-stage6-e2e.mjs` также PASS: 5 ожидаемых worker failures, затем 6 успешных
+viewport cases и 12 уникальных PNG; второй набор workers=4/repeat-each=2 — 12 успешных
+viewport cases и 24 PNG, без retries. Временный checkout удалён самим harness.
+
+Основные журналы проверки на этой машине (вне Git):
+
+- `/tmp/finora-stage7-final-gates.log` и `/tmp/finora-stage7-final-gates/` — macOS;
+- `/tmp/finora-stage7-linux-final-gates.log` — Linux frozen install и полный набор;
+- `/tmp/finora-stage7-final-docker-browser3.log` — окончательная Docker-приёмка;
+- `/tmp/finora-stage7-linux-matrix3.log` — итоговая matrix 1/2/4;
+- `/tmp/finora-stage7-linux-final-stage6.log` — Linux worker/artifact regression.
+
+Сохраняются и журналы неуспешных диагностических попыток:
+`/tmp/finora-stage7-final-docker-browser.log`,
+`/tmp/finora-stage7-linux-matrix.log`, `/tmp/finora-stage7-linux-matrix2.log`.
+Ни один ранний failed run не засчитан в итоговую последовательную stress-серию.
+
+### Финальный stress protocol
+
+macOS stress включён в `CI=1 pnpm test:e2e:auth`. Для Linux использована та же
+реализация runner с browser execution в существующем non-root контейнере:
+
+```bash
+FINORA_COMPOSE_URL=http://web \
+FINORA_STRESS_COMPOSE_PROJECT=finora-stage7-linux \
+FINORA_STRESS_COMPOSE_DIR="$PWD" \
+FINORA_STRESS_BROWSER_CONTAINER=finora-stage7-browser \
+pnpm test:e2e:stage7-stress
+```
+
+Текущий каталог — корень этого checkout. Host shell использует указанные выше
+Node/pnpm; в контейнере такой же toolchain, все browser commands выполняются под
+uid=1000. Runner использует `--project=dashboard --no-deps --grep=critical:`,
+`--repeat-each=2 --retries=0`, workers циклически 1,2,4. Каждый из 20 запусков
+выполняет шесть cases: три критических сценария по два раза. Они включают реальную
+обратную доставку A→B/январь→февраль→март, создание операции при pending GET,
+logout/login двух владельцев с поздним ответом, reload, navigation и resize.
+Сброс API limiter производится до каждого запуска с ожиданием container health;
+это не retry упавшего case. Setup выполняется один раз до серии, его storageState
+удаляется в finally. Внутри каждого case финансовые fixtures собственные, удаление
+проверяется через DELETE и последующий GET 404.
+
+**Итог после последней правки кода:** macOS **20/20 последовательных запусков,
+120 passed / 0 failed**; Linux/non-root **20/20 последовательных запусков,
+120 passed / 0 failed**. Повторный финальный Linux журнал:
+`/tmp/finora-stage7-linux-final-stress.log`. Ранние отдельные green-серии не сложены
+с этой серией и не использованы для достижения порога. Linux Stage 6 regression
+и matrix выше также выполнены на окончательном production/test коде.
+
+**Stage 7 завершён в своём ROADMAP scope.** Все обязательные gates пройдены;
+после них изменена только документация результатов, повторно проверены formatting
+и `git diff --check`. В working tree 37 ожидаемых файлов: Dashboard backend/frontend,
+контракт/клиент, новые проверки/runner, минимальная интеграция и документация.
+Случайных screenshots/traces/logs/temp files в Git status нет; диагностические
+журналы находятся вне repo, browser artifacts — в предусмотренных ignored outputDir.
+Созданные тестовые Compose/volume и Linux browser container удаляются после
+проверки; другие проекты не затрагиваются. HEAD остаётся
+`680e6a5a9b484344b5d9e8d89c33c1cd5084bf48`.
+
+Не начинались Stage 8 recurring/scheduler/catch-up, Stage 9 CSV, Stage 10 audit UI,
+Stage 11 общая финальная приёмка всего продукта и Stage 12 deployment/demo.
+Базовая запись аудита прежних этапов сохранена. Commit, push, force, rebase,
+reset чужих изменений и новый remote CI не выполнялись.

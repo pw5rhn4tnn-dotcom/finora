@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, test, vi } from 'vitest';
+import { dashboardFixture } from '../../test/dashboard-fixture';
 import { App } from '../../App';
 import { AuthProvider } from './AuthProvider';
 import { sessionKey } from './auth-context';
@@ -21,7 +22,11 @@ function respond(
   return vi
     .spyOn(globalThis, 'fetch')
     .mockImplementation((input, init) =>
-      Promise.resolve(handler(urlOf(input), init)),
+      Promise.resolve(
+        urlOf(input).includes('/dashboard?')
+          ? Response.json(dashboardFixture())
+          : handler(urlOf(input), init),
+      ),
     );
 }
 const problem = (status: number, detail: string, errors = {}) =>

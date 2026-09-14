@@ -2849,12 +2849,143 @@
           "Бюджеты"
         ]
       }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "description": "Обязательны year и month без ведущих нулей. Неизвестные и повторные query-поля запрещены. Полное шестимесячное окно: выбранный месяц от 0001-06 до 9999-12. DATE сравнивается без сдвига timezone. Сравнения insights относятся ко всему предыдущему календарному месяцу, а не к одинаковому числу дней.",
+        "operationId": "dashboardGet",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "description": "Год выбранного месяца, обязателен",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9999,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "description": "Месяц 1–12, обязателен; без ведущего нуля",
+            "schema": {
+              "minimum": 1,
+              "maximum": 12,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Согласованный обзор собственных финансов за месяц",
+        "tags": [
+          "Обзор"
+        ]
+      }
     }
   },
   "info": {
     "title": "Finora API",
-    "description": "Finora: авторизация, настройки, категории, операции и месячные бюджеты. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.",
-    "version": "0.6.0",
+    "description": "Finora: авторизация, настройки, категории, операции, месячные бюджеты и обзор с insights. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.",
+    "version": "0.7.0",
     "contact": {}
   },
   "tags": [],
@@ -3715,6 +3846,194 @@
           }
         },
         "additionalProperties": false
+      },
+      "DashboardMonthDto": {
+        "type": "object",
+        "properties": {
+          "income": {
+            "type": "string",
+            "description": "Доходы в основной валюте, точная десятичная строка"
+          },
+          "expense": {
+            "type": "string",
+            "description": "Расходы в основной валюте, точная десятичная строка"
+          },
+          "net": {
+            "type": "string",
+            "description": "Доходы минус расходы, может быть отрицательным"
+          },
+          "savingsRate": {
+            "type": "string",
+            "description": "(Доходы − расходы) / доходы × 100, HALF_UP до 2 знаков; null при нулевом доходе",
+            "nullable": true
+          },
+          "hasTransactions": {
+            "type": "boolean",
+            "description": "Есть хотя бы одна операция в этом месяце"
+          },
+          "year": {
+            "type": "number",
+            "description": "Календарный год"
+          },
+          "month": {
+            "type": "number",
+            "description": "Календарный месяц 1–12"
+          }
+        },
+        "required": [
+          "income",
+          "expense",
+          "net",
+          "savingsRate",
+          "hasTransactions",
+          "year",
+          "month"
+        ]
+      },
+      "DashboardCategoryDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "description": "Собственная категория, включая архивную",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Сумма расходов в основной валюте"
+          },
+          "share": {
+            "type": "string",
+            "description": "Доля расходов в процентах, HALF_UP до 2 знаков"
+          }
+        },
+        "required": [
+          "category",
+          "amount",
+          "share"
+        ]
+      },
+      "DashboardInsightDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Стабильный код правила",
+            "enum": [
+              "BUDGET_OVER",
+              "BUDGET_NEAR",
+              "EXPENSE_UP",
+              "SAVINGS_DOWN",
+              "SAVINGS_UP",
+              "EXPENSE_DOWN",
+              "LARGEST_CATEGORY"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "Краткий вывод"
+          },
+          "description": {
+            "type": "string",
+            "description": "Наблюдение на основе выбранного и предыдущего календарных месяцев; не прогноз"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "description"
+        ]
+      },
+      "DashboardDto": {
+        "type": "object",
+        "properties": {
+          "income": {
+            "type": "string",
+            "description": "Доходы в основной валюте, точная десятичная строка"
+          },
+          "expense": {
+            "type": "string",
+            "description": "Расходы в основной валюте, точная десятичная строка"
+          },
+          "net": {
+            "type": "string",
+            "description": "Доходы минус расходы, может быть отрицательным"
+          },
+          "savingsRate": {
+            "type": "string",
+            "description": "(Доходы − расходы) / доходы × 100, HALF_UP до 2 знаков; null при нулевом доходе",
+            "nullable": true
+          },
+          "hasTransactions": {
+            "type": "boolean",
+            "description": "Есть хотя бы одна операция в этом месяце"
+          },
+          "year": {
+            "type": "number",
+            "description": "Календарный год"
+          },
+          "month": {
+            "type": "number",
+            "description": "Календарный месяц 1–12"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Основная валюта владельца из того же снимка БД"
+          },
+          "trend": {
+            "description": "Шесть месяцев по возрастанию: выбранный и пять предыдущих; отсутствующие месяцы заполнены нулями",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardMonthDto"
+            }
+          },
+          "distribution": {
+            "description": "Все категории расходов; сумма DESC, UUID ASC при равенстве",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCategoryDto"
+            }
+          },
+          "topCategories": {
+            "description": "Первые пять категорий того же распределения",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCategoryDto"
+            }
+          },
+          "budgets": {
+            "description": "Все собственные бюджеты выбранного месяца с семантикой Stage 6, UUID ASC",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetDto"
+            }
+          },
+          "insights": {
+            "description": "До четырёх детерминированных наблюдений по приоритету; пусто при недостатке данных",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardInsightDto"
+            }
+          }
+        },
+        "required": [
+          "income",
+          "expense",
+          "net",
+          "savingsRate",
+          "hasTransactions",
+          "year",
+          "month",
+          "currency",
+          "trend",
+          "distribution",
+          "topCategories",
+          "budgets",
+          "insights"
+        ]
       }
     }
   }

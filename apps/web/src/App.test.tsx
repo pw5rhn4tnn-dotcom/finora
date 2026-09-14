@@ -5,10 +5,14 @@ import { testUser } from './test/fixtures';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import { dashboardFixture } from './test/dashboard-fixture';
 import { App } from './App';
 
 function mount(path = '/') {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    Response.json(dashboardFixture()),
+  );
   const client = new QueryClient({
     defaultOptions: { queries: { enabled: false } },
   });
@@ -24,22 +28,20 @@ function mount(path = '/') {
   );
 }
 
-test('монтирует Finora shell и честное предварительное состояние', () => {
+test('монтирует Finora shell и рабочий обзор', () => {
   mount();
   expect(
     screen.getByRole('heading', { name: 'Обзор', level: 1 }),
   ).toBeDefined();
-  expect(screen.getByRole('main').textContent).toContain(
-    'Разделы в разработке',
-  );
+  expect(screen.getByLabelText('Месяц')).toBeDefined();
   expect(
     screen
       .getByRole('link', { name: 'Перейти к содержимому' })
       .getAttribute('href'),
   ).toBe('#main-content');
   expect(
-    screen.queryByRole('button', { name: /Добавить операцию/ }),
-  ).toBeNull();
+    screen.getByRole('button', { name: /Добавить операцию/ }),
+  ).toBeDefined();
 });
 
 test('desktop navigation переключает route, active state, title и focus', async () => {

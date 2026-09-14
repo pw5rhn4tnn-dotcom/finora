@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0–5 завершены. Stage 6 реализован, но remote GitHub Actions run `34850152076` завершился FAILED; repair/review прошёл локальные команды CI, Docker и browser acceptance на macOS и budget/regression проверки Linux без root. Повторный remote green ещё не подтверждён; scope не расширен. Локальная проверка команд CI на macOS не доказывает эквивалентность Linux runner. Stage 7–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stages 0–6 завершены и опубликованы; по сообщению пользователя последний remote GitHub Actions после двух CI repair-pass — GREEN. Stage 7 завершён в своём scope: локальный CI-equivalent, Docker и Linux/non-root приёмка PASS; Stage 8–12 не начаты. Новый remote run для этих изменений не запускался. Локальный PASS не подменяет GitHub Actions. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -128,7 +128,7 @@ Docker clean/repeated startup, DB recovery и persistence после mutations �
 
 ## Stage 6 — Budgets
 
-**Статус:** repair/review после FAILED remote CI проверен локально: 61 backend / 65 frontend / 15 shell / 18 auth+finance / 12 budgets + setup, полный Docker и worker/artifact regressions — Passed. Budgets/regressions дополнительно Passed в Linux без root и без /private/tmp. Повторный remote green не подтверждён, исправления не опубликованы; Stage 7 не начат. Диагностика и ограничения — в REPORT. Scope, schema, migration и seed не меняются.
+**Статус:** завершён и опубликован. По сообщению пользователя последний remote GitHub Actions после Stage 6 и двух CI repair-pass — GREEN. История диагностики и локальных проверок сохранена в REPORT. Регрессии Stage 6 повторяются при приёмке Stage 7; schema, migration и seed не меняются.
 
 **Цель:** добавить месячное планирование расходов и видимый прогресс.
 
@@ -145,6 +145,8 @@ Docker clean/repeated startup, DB recovery и persistence после mutations �
 **Документация / REPORT:** фактические бюджетные сценарии, тесты агрегации и уникальности, обновленные API/seed.
 
 ## Stage 7 — Dashboard & Financial Insights
+
+**Статус:** завершён локально. Все обязательные проверки текущего scope PASS на macOS и Linux/non-root; stress — по 20 последовательных запусков без retries на каждой платформе. Commit/push и новый remote CI не выполнялись. Полная продуктовая приёмка ближайших регулярных операций остаётся в Stage 8. Доказательства и ограничения — REPORT.
 
 **Цель:** превратить историю операций в содержательную аналитику.
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { financeAcceptance } from './finance-acceptance.mjs';
+import { dashboardAcceptance } from './dashboard-acceptance.mjs';
 import { budgetAcceptance } from './budget-acceptance.mjs';
 import { securityCompose } from './security-compose.mjs';
 import { execFile } from 'node:child_process';
@@ -198,6 +199,7 @@ try {
   await compose('up', '-d', '--wait', '--wait-timeout', '180', 'api');
   await financeAcceptance(financeUrl, compose, databaseHash);
   await budgetAcceptance(financeUrl, compose, databaseHash);
+  await dashboardAcceptance(financeUrl, compose, databaseHash);
   if (process.argv.includes('--browser')) {
     const resultsRoot = resolve('apps/web/test-results');
     await mkdir(resultsRoot, { recursive: true });
@@ -257,6 +259,36 @@ try {
       timeout: 300000,
     });
     console.log(regression.stdout);
+    await compose('restart', 'api');
+    await compose('up', '-d', '--wait', '--wait-timeout', '180');
+    const dashboard = await exec(
+      'pnpm',
+      [
+        '--filter',
+        '@finora/web',
+        'exec',
+        'playwright',
+        'test',
+        'dashboard.compose.spec.ts',
+      ],
+      {
+        env: { ...browserEnv, FINORA_COMPOSE_URL: browserUrl },
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: 300000,
+      },
+    );
+    console.log(dashboard.stdout);
+    const stress = await exec('node', ['scripts/check-stage7-e2e.mjs'], {
+      env: {
+        ...browserEnv,
+        FINORA_COMPOSE_URL: browserUrl,
+        FINORA_STRESS_COMPOSE_PROJECT: project,
+        FINORA_STRESS_COMPOSE_DIR: checkout,
+      },
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 1200000,
+    });
+    console.log(stress.stdout);
   }
   console.log(
     `PASS: clean/repeated startup, seed ×3, DB outage/recovery; dataset SHA-256 ${before}`,

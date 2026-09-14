@@ -1,9 +1,9 @@
 # Finora
 
 Finora — приложение для управления личными финансами по [DISCOVERY.md](DISCOVERY.md).
-Stage 1–5 сохранены. Stage 6 добавляет месячные бюджеты expense-категорий:
-лимиты в основной валюте, фактические расходы, прогресс и атомарный audit.
-Dashboard/Insights, CSV, scheduler и интерфейс журнала остаются следующими этапами.
+Stages 1–6 сохранены. Stage 7 добавляет Dashboard и детерминированные Insights
+поверх операций и месячных бюджетов. CSV, scheduler и интерфейс журнала остаются
+следующими этапами.
 Фактические результаты приёмки записаны в REPORT.
 
 ## Запуск с чистого checkout
@@ -241,10 +241,9 @@ frozen install, schema validation, lint, format, strict typecheck, smoke/integra
 build, Playwright/axe UI smoke, проверку OpenAPI generation и auth E2E через Compose/Nginx. Второй выполняет clean/repeated Docker acceptance,
 включая build обоих images. Тестовые данные воспроизводимы, developer machine не нужна.
 
-**По данным пользователя, Stage 5 (`352d4cb`) прошёл GitHub Actions.**
-Результаты локальных прогонов команд CI Stage 6 записаны в REPORT. Успех на macOS
-не гарантирует успех host-side scripts/Playwright в Linux GitHub Actions;
-текущий repair pass после remote FAILED описан отдельно. Commit/push
+**По данным пользователя, Stages 0–6 опубликованы; последний remote GitHub Actions
+после Stage 6 и двух CI repair-pass — GREEN.** Локальные проверки Stage 7
+записываются отдельно в REPORT; они не заменяют новый remote run. Commit/push
 текущей рабочей версии не выполнялись; remote CI для неё не запускался.
 
 ## UI foundation
@@ -354,3 +353,48 @@ auth limiter. Порог production rate limit не меняется. `pnpm test
 Seed уже содержит 16 месячных бюджетов и состояния около/сверх лимита, без изменения
 пользовательских данных при повторном запуске. Rollover, копирование, scheduler и
 аналитика dashboard в Stage 6 не входят.
+
+## Обзор и наблюдения (Stage 7)
+
+После входа открывается Dashboard: доходы, расходы, разница и доля сбережений,
+расходы по категориям, тренд за шесть месяцев, Top-5, бюджеты и до четырёх
+обоснованных наблюдений. Текущий месяц определяется timezone профиля. Выбранный
+месяц хранится в URL `/?period=2026-09`; «Текущий месяц» возвращает к текущему.
+Для отсутствующих расходов/бюджетов/истории есть отдельные пустые состояния,
+ошибка загрузки предлагает повторить запрос. При income = 0 доля сбережений
+не определена; отрицательная разница не является балансом банковского счёта.
+
+`GET /api/v1/dashboard?year=2026&month=9` отдаёт все блоки из одного согласованного
+снимка PostgreSQL. Принимает только year/month без ведущих нулей. Диапазон выбранного
+месяца 0001-06…9999-12 нужен для полного шестимесячного окна. Все суммы — decimal
+strings в основной валюте. Архивные категории сохраняются в аналитике. Полный
+контракт виден в Swagger; клиент воспроизводится через `pnpm api:generate`.
+
+Пороги наблюдений: превышение бюджета или использование от 90%, рост/снижение
+расходов от 20%, изменение доли сбережений от 10 п.п., крупнейшая категория от 30%.
+Приоритеты и условия достаточности описаны в [ARCHITECTURE.md](ARCHITECTURE.md), §31.
+Сравниваются полные календарные месяцы, включая пока незавершённый текущий.
+При отсутствии базы проценты не выдумываются. Регулярные операции ещё не подключены.
+
+Для проверки: войдите в personal demo, выберите месяц seed, раскройте точные
+значения под графиком, откройте создание операции, сохраните расход и проверьте
+изменение KPI, категории и бюджета. В family demo аналитика другого владельца.
+Seed уже содержит шесть месяцев и нужные бюджетные сценарии, поэтому не менялся.
+
+```bash
+pnpm test:e2e:auth
+# Отдельный Dashboard suite на уже поднятом disposable Compose:
+FINORA_COMPOSE_URL=http://127.0.0.1:8080 pnpm --filter @finora/web exec playwright test dashboard.compose.spec.ts --workers=2 --retries=0
+# 20 последовательных запусков, 120 critical cases, workers 1/2/4, без retries:
+FINORA_COMPOSE_URL=http://127.0.0.1:8080 FINORA_STRESS_COMPOSE_PROJECT=finora-test FINORA_STRESS_COMPOSE_DIR="$PWD" pnpm test:e2e:stage7-stress
+```
+
+Browser suite создаёт собственные записи и удаляет их в finally; использует
+неизменяемые сессии setup и новые contexts для каждого теста. Stress перезапускает API указанного disposable Compose перед каждым запуском,
+чтобы реальные повторные входы не делили limiter; production policy не меняется.
+Также повторяет logout/login, двух владельцев, navigation, resize и управляемую обратную доставку настоящих ответов и create → cancel → refetch.
+Смена владельца с поздним ответом, error/retry, семь viewport, 200% текста и axe
+проверяются полным suite. Artifacts создаются через `testInfo.outputPath()`;
+секретные storageState не входят в Git и удаляются runner после прогона.
+Для параллельных Playwright процессов задайте разные `FINORA_PLAYWRIGHT_OUTPUT_DIR`.
+Не запускайте тесты на пользовательских production-данных: нужен отдельный Compose.

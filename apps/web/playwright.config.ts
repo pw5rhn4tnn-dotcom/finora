@@ -35,7 +35,11 @@ export default defineConfig({
         ? { dependencies: ['compose-auth'] }
         : {}),
       testIgnore: process.env.FINORA_COMPOSE_URL
-        ? ['**/budgets.compose.spec.ts', '**/*.setup.ts']
+        ? [
+            '**/budgets.compose.spec.ts',
+            '**/dashboard.compose.spec.ts',
+            '**/*.setup.ts',
+          ]
         : ['**/*.compose.spec.ts', '**/*.setup.ts'],
       outputDir: join(outputRoot, 'chromium'),
       use: { browserName: 'chromium' },
@@ -61,6 +65,13 @@ export default defineConfig({
               trace: 'off' as const,
               screenshot: 'off' as const,
             },
+          },
+          {
+            name: 'dashboard',
+            testMatch: '**/dashboard.compose.spec.ts',
+            dependencies: ['budgets-auth'],
+            outputDir: join(outputRoot, 'dashboard'),
+            use: { browserName: 'chromium' as const },
           },
           {
             name: 'budgets',

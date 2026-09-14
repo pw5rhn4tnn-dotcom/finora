@@ -564,6 +564,92 @@ export interface BudgetPatchDto {
   limitAmount?: string;
 }
 
+export interface DashboardMonthDto {
+  /** Доходы в основной валюте, точная десятичная строка */
+  income: string;
+  /** Расходы в основной валюте, точная десятичная строка */
+  expense: string;
+  /** Доходы минус расходы, может быть отрицательным */
+  net: string;
+  /**
+     * (Доходы − расходы) / доходы × 100, HALF_UP до 2 знаков; null при нулевом доходе
+     * @nullable
+     */
+  savingsRate: string | null;
+  /** Есть хотя бы одна операция в этом месяце */
+  hasTransactions: boolean;
+  /** Календарный год */
+  year: number;
+  /** Календарный месяц 1–12 */
+  month: number;
+}
+
+export interface DashboardCategoryDto {
+  /** Собственная категория, включая архивную */
+  category: CategoryDto;
+  /** Сумма расходов в основной валюте */
+  amount: string;
+  /** Доля расходов в процентах, HALF_UP до 2 знаков */
+  share: string;
+}
+
+/**
+ * Стабильный код правила
+ */
+export type DashboardInsightDtoCode = typeof DashboardInsightDtoCode[keyof typeof DashboardInsightDtoCode];
+
+
+export const DashboardInsightDtoCode = {
+  BUDGET_OVER: 'BUDGET_OVER',
+  BUDGET_NEAR: 'BUDGET_NEAR',
+  EXPENSE_UP: 'EXPENSE_UP',
+  SAVINGS_DOWN: 'SAVINGS_DOWN',
+  SAVINGS_UP: 'SAVINGS_UP',
+  EXPENSE_DOWN: 'EXPENSE_DOWN',
+  LARGEST_CATEGORY: 'LARGEST_CATEGORY',
+} as const;
+
+export interface DashboardInsightDto {
+  /** Стабильный код правила */
+  code: DashboardInsightDtoCode;
+  /** Краткий вывод */
+  title: string;
+  /** Наблюдение на основе выбранного и предыдущего календарных месяцев; не прогноз */
+  description: string;
+}
+
+export interface DashboardDto {
+  /** Доходы в основной валюте, точная десятичная строка */
+  income: string;
+  /** Расходы в основной валюте, точная десятичная строка */
+  expense: string;
+  /** Доходы минус расходы, может быть отрицательным */
+  net: string;
+  /**
+     * (Доходы − расходы) / доходы × 100, HALF_UP до 2 знаков; null при нулевом доходе
+     * @nullable
+     */
+  savingsRate: string | null;
+  /** Есть хотя бы одна операция в этом месяце */
+  hasTransactions: boolean;
+  /** Календарный год */
+  year: number;
+  /** Календарный месяц 1–12 */
+  month: number;
+  /** Основная валюта владельца из того же снимка БД */
+  currency: string;
+  /** Шесть месяцев по возрастанию: выбранный и пять предыдущих; отсутствующие месяцы заполнены нулями */
+  trend: DashboardMonthDto[];
+  /** Все категории расходов; сумма DESC, UUID ASC при равенстве */
+  distribution: DashboardCategoryDto[];
+  /** Первые пять категорий того же распределения */
+  topCategories: DashboardCategoryDto[];
+  /** Все собственные бюджеты выбранного месяца с семантикой Stage 6, UUID ASC */
+  budgets: BudgetDto[];
+  /** До четырёх детерминированных наблюдений по приоритету; пусто при недостатке данных */
+  insights: DashboardInsightDto[];
+}
+
 export type CategoriesListParams = {
 /**
  * Номер страницы от 1
@@ -712,6 +798,21 @@ export const BudgetsListPageSize = {
   NUMBER_25: 25,
   NUMBER_50: 50,
 } as const;
+
+export type DashboardGetParams = {
+/**
+ * Год выбранного месяца, обязателен
+ * @minimum 1
+ * @maximum 9999
+ */
+year: number;
+/**
+ * Месяц 1–12, обязателен; без ведущего нуля
+ * @minimum 1
+ * @maximum 12
+ */
+month: number;
+};
 
 export type healthLiveResponse200 = {
   data: HealthDto
@@ -2907,4 +3008,97 @@ export const budgetsDelete = async (id: string, options?: RequestInit): Promise<
 
   const data: budgetsDeleteResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as budgetsDeleteResponse
+}
+
+
+
+export type dashboardGetResponse200 = {
+  data: DashboardDto
+  status: 200
+}
+
+export type dashboardGetResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type dashboardGetResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type dashboardGetResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type dashboardGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type dashboardGetResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type dashboardGetResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type dashboardGetResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type dashboardGetResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type dashboardGetResponseSuccess = (dashboardGetResponse200) & {
+  headers: Headers;
+};
+export type dashboardGetResponseError = (dashboardGetResponse400 | dashboardGetResponse401 | dashboardGetResponse403 | dashboardGetResponse404 | dashboardGetResponse409 | dashboardGetResponse413 | dashboardGetResponse429 | dashboardGetResponse500) & {
+  headers: Headers;
+};
+
+export type dashboardGetResponse = (dashboardGetResponseSuccess | dashboardGetResponseError)
+
+export const getDashboardGetUrl = (params: DashboardGetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/dashboard?${stringifiedParams}` : `/api/v1/dashboard`
+}
+
+/**
+ * Обязательны year и month без ведущих нулей. Неизвестные и повторные query-поля запрещены. Полное шестимесячное окно: выбранный месяц от 0001-06 до 9999-12. DATE сравнивается без сдвига timezone. Сравнения insights относятся ко всему предыдущему календарному месяцу, а не к одинаковому числу дней.
+ * @summary Согласованный обзор собственных финансов за месяц
+ */
+export const dashboardGet = async (params: DashboardGetParams, options?: RequestInit): Promise<dashboardGetResponse> => {
+
+  const res = await fetch(getDashboardGetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: dashboardGetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as dashboardGetResponse
 }
