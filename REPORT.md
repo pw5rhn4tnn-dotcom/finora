@@ -1024,7 +1024,7 @@ Vite предупреждает о JS chunk чуть больше 500 kB до gz
 UI защищён от двойного нажатия и автоматических retry. Прежний stateless logout
 очищает cookie, но скопированный JWT остаётся валиден до TTL. Remote GitHub Actions
 для Stage 5 не запускался: commit/push запрещены; remote Stage 4 — прежняя стабильная
-точка, указанная пользователем. Новая проверка — локальный эквивалент CI.
+точка, указанная пользователем. Новая проверка — локальный прогон команд CI на macOS.
 
 ### Итоговая приёмка Stage 5 — completed
 
@@ -1073,7 +1073,7 @@ Stage 5 завершён. Stage 6 не начинался. Commit/push и изм
 
 Задание: выполнить только Stage 6, без commit/push и изменения history; законченный
 budget workflow, реальная PostgreSQL/Compose, browser acceptance, self-review и
-полный локальный CI-equivalent. Использован Codex с локальными shell/patch tools;
+полный локальный набор команд CI на macOS. Использован Codex с локальными shell/patch tools;
 новые зависимости не добавлялись, sub-agents не запускались.
 
 Исследованы PROJECT, DISCOVERY, AI_RULES, ARCHITECTURE, ROADMAP и текущие README/REPORT,
@@ -1144,7 +1144,7 @@ frontend 65/65, lint и typecheck пройдены. На 10000 операций 
 Повторная полная финальная приёмка выполняется после этих исправлений; её результаты
 фиксируются ниже только по завершении команд.
 
-Финальный после-review CI-equivalent прошёл: backend 61/61, frontend 65/65,
+Финальный после-review набор команд CI на macOS прошёл: backend 61/61, frontend 65/65,
 shell 15/15; Compose browser 18/18 + 12/12 и отдельный Docker job — PASS.
 Просмотр финальных PNG выявил дополнительную layout-регрессию: после выделения
 scroll area flex-шапка могла сжаться до min-height и вынести строку профиля за
@@ -1212,3 +1212,144 @@ lockfile не менялись. Финансовая арифметика ост
 Stage 6 завершён. Stage 7 и последующие этапы не начинались: Dashboard/Insights,
 scheduler, CSV, audit UI, dark mode и прочий последующий scope отложены. Commit,
 push и изменение Git history не выполнялись; HEAD остаётся `352d4cb`.
+
+## Stage 6 — repair/review после remote FAILED (2026-09-14)
+
+Запрос пользователя: исправить только Stage 6, отдельно исследовать 1440×960,
+проверить portability/isolation и весь набор CI; Stage 7, commit и push запрещены.
+Использованы Codex, skill diagnosing-bugs, shell/patch, read-only GitHub CLI,
+Chromium/Playwright и локальный Docker. Sub-agents не запускались.
+Начальная рабочая копия чистая, HEAD `f81e4f9`; remote run `34850152076` — FAILED.
+Предыдущие записи «Stage 6 завершён» описывали локальную приёмку на macOS;
+объявлять remote CI зелёным по этим результатам было бы неверно.
+
+Remote GitHub Actions обнаружил два macOS-specific screenshot пути в
+`apps/web/e2e/budgets.compose.spec.ts`: `/private/tmp/finora-stage6-${width}-normal.png`
+и `/private/tmp/finora-stage6-${width}.png`. В macOS каталог уже существовал.
+Docker acceptance запускал Linux приложение, но сам Playwright/Node runner оставался
+на macOS: одинаковые команды не означали одинаковую host filesystem/platform.
+Формулировка CI-equivalent заменена явным указанием macOS в README/ROADMAP/REPORT.
+Исторические абсолютные пути логов в REPORT сохранены как фактические места старых
+локальных файлов, а не переносимые команды.
+
+Поиск по всем tracked source/tests/scripts/config: других host-specific temp paths
+не найдено. Compose runner уже использовал `mkdtemp(join(os.tmpdir(), ...))`;
+`/var/lib/postgresql/data`, `/var/lib/apt/lists`, `/etc/nginx`, `/usr/share/nginx/html`
+и `/app` принадлежат закреплённым Linux images, а не filesystem хоста. Относительные
+пути package scripts разрешаются из workspace/package cwd согласно entrypoints.
+
+Причина 1440×960 подтверждена remote Nginx log: после перезапуска API в 13:41:01
+между 13:41:07 и 13:41:25 было ровно 10 успешных POST /auth/login. Первые два —
+beforeAll, третий — явный UI login, следующие — повторения beforeAll после ENOENT.
+В 13:41:26 одиннадцатый вход получил 429 (лимит 10/min/IP). Тест 1440×960 отмечен
+как 0 ms: тело не запустилось, ожидание «Обзор» упало в login hook. Это каскад через
+общее серверное состояние rate limiter, а не responsive layout. Page/context каждого
+viewport уже были свежими; общими были mutable cookies и семейный BrowserContext
+в beforeAll. Setup повторялся после каждого failed test вместе с новым worker.
+
+Промежуточная проверка изменения только screenshot paths: все шесть viewport,
+включая 1440×960, прошли на macOS и Linux. Полный macOS run: 11/12 — отдельный axe
+сбой keyboard-only; измерены переходные disabled/enabled цвета кнопки (3.63:1).
+Перед axe теперь проверяется завершение реально выполняющихся Web Animations/CSS
+transitions; набор WCAG rules и assertions сохранён, retries/timeouts не увеличены.
+Первый Linux run под root также пропустил старый дефект: root мог создать /private/tmp.
+Поэтому точное воспроизведение проведено под непривилегированным пользователем node.
+
+Исправления: screenshot сохраняются через testInfo.outputPath и прикрепляются
+к test report; подготовка двух настоящих demo-сессий вынесена в зависимый setup
+project, каждый тест получает новый context/page из неизменяемого storageState.
+Семейный context теперь test-scoped и закрывается в finally. UI login сохранён
+и дополнен assertion HTTP 200 перед прежним assertion заголовка. Viewport tests
+получили отдельные месяцы и cleanup созданных budget/transaction/category в finally.
+Compose browser runner выделяет уникальный каталог результатов на каждый запуск,
+печатает полный stdout/stderr дочернего процесса при падении и запускает regression.
+Никакой production auth policy или новой функциональности не менялось.
+
+Regression `scripts/check-stage6-e2e.mjs` запускает временную копию настоящего
+budget suite: 5 намеренных падений после загрязнения cookies/localStorage/routes,
+потом все 6 viewport; затем 12 viewport (repeat-each=2, workers=4). Проверяются
+точные ожидаемые причины аварий, отсутствие любых других ошибок/retries,
+наличие двух отдельных PNG на каждый viewport внутри заданного outputDir.
+Ненулевой exit первого дочернего процесса — проверяемый результат fault injection,
+не подавление ошибок основной suite. Временная копия/сессии удаляются в finally.
+
+Точное Linux non-root воспроизведение исходного HEAD: 3 passed, 5 failed,
+4 did not run. Четыре ENOENT и затем 1440×960 с 0 ms, stack login:28 → beforeAll:39,
+Nginx POST /auth/login 429. Логи: `finora-stage6-repair-linux-nonroot-red.log`
+и `finora-stage6-repair-linux-nonroot-http.log` в системном временном каталоге
+диагностики. Первые проверки нового harness выявили ошибки его подготовки ESM
+и ожидаемого DELETE status; исправлены по реальным package/API contracts.
+Повтор regression на macOS прошёл: 5 ожидаемых worker failures + 6 passed viewport,
+затем 12 passed viewport на 4 workers; все 36 PNG проверены.
+
+### Подтверждённые результаты repair pass
+
+После последних изменений tests/config/scripts выполнен весь набор команд
+существующего CI на macOS (Node 24.21.0, pnpm 12.4.1, PostgreSQL 17.6),
+а budgets и regression дополнительно выполнены в Linux без root и без /private/tmp.
+Документация фиксирует этот успешный набор; на окончательной рабочей копии набор
+проверяется повторно перед передачей результата. Ни один прежний диагностический
+Failed не считается финальным Passed без последующего успешного запуска.
+
+| Команда / проверка                                                                          | Результат                                                                                              |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `pnpm install --frozen-lockfile`                                                            | Passed, lockfile без изменений                                                                         |
+| `pnpm db:generate`, `pnpm db:validate`                                                      | Passed                                                                                                 |
+| `pnpm format:check`                                                                         | Passed                                                                                                 |
+| `pnpm lint`                                                                                 | Passed                                                                                                 |
+| `pnpm typecheck`                                                                            | Passed                                                                                                 |
+| `pnpm test` — backend                                                                       | Passed, 61/61, настоящая PostgreSQL                                                                    |
+| `pnpm test` — frontend                                                                      | Passed, 65/65                                                                                          |
+| `pnpm build`                                                                                | Passed, API + production web                                                                           |
+| `pnpm api:generate`, `pnpm api:check`                                                       | Passed, generated output без diff                                                                      |
+| `pnpm --filter @finora/web exec playwright install --with-deps chromium`                    | Passed                                                                                                 |
+| `pnpm test:e2e`                                                                             | Passed, 15/15 shell                                                                                    |
+| `pnpm test:e2e:auth`                                                                        | Passed, полный Docker + 18 auth/finance + 12 budget + 1 setup + regression                             |
+| `pnpm --filter @finora/web exec playwright test budgets.compose.spec.ts`                    | Passed, 12/12 + 1 setup на macOS и Linux                                                               |
+| `pnpm test:e2e:stage6-regression` / `node scripts/check-stage6-e2e.mjs`                     | Passed на macOS/Linux: 5 точных fault injections → 6 viewport; затем 12 viewport при workers=4; 36 PNG |
+| `node scripts/test-docker.mjs` (точная команда отдельного CI job, также `pnpm test:docker`) | Passed                                                                                                 |
+| Stage 6 browser acceptance                                                                  | Passed: 6 viewport, a11y/keyboard/200% text/Sheet; PNG просмотрены                                     |
+| Linux portability                                                                           | Passed под пользователем node; `/private/tmp` отсутствовал до и после budget/regression run            |
+| `git diff --check`                                                                          | Passed                                                                                                 |
+
+Все обычные E2E прошли без retries и без skipped tests. Fault injection запускается
+в отдельной временной копии и проверяет ровно заданные ошибки; в обычном budget
+suite намеренных падений нет. Повторные ручные/локальные commands сами по себе
+не являются добавлением retries в Playwright config. Vite сохранил прежнее
+предупреждение о chunk >500 kB; лимит предупреждения не менялся.
+
+Полный Docker acceptance: чистая копия без node_modules/.env, сборки, migrate deploy,
+healthy web/API/PostgreSQL, HTTP/Swagger, seed ×3 без изменения baseline, readiness
+200 → 503 → 200 и liveness при DB outage, повторный startup, финансовый CRUD,
+category archive, budget CRUD/duplicate/ownership, чужие расходы не влияют на spent,
+Decimal/date и сохранность edited/deleted state после seed/restart. Dataset SHA-256
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Оба acceptance runner удалили свои containers/volumes в finally.
+
+Self-review: responsive/a11y assertions и оба screenshot сохранены; retries/timeout
+в конфиге не увеличены, skip/only не добавлены, auth policy не ослаблена.
+Проверены fresh context/page, failure restart, session setup, отдельные месяцы и
+cleanup, уникальные output paths, PNG signature, воспроизводимость клиента, отсутствие
+случайных artifacts среди tracked/untracked исходников. Dependency versions,
+lockfile, Prisma schema/migrations/seed и production application code без изменений.
+`test-results` и временные screenshots/traces не включены в Git; диагностические
+артефакты сохраняются вне рабочей копии после проверки.
+
+Изменённые файлы (полный список): README.md, REPORT.md, ROADMAP.md,
+apps/web/README.md, apps/web/e2e/budgets.compose.spec.ts,
+apps/web/e2e/budget-session.ts, apps/web/e2e/budgets.setup.ts,
+apps/web/playwright.config.ts, package.json, scripts/test-docker.mjs,
+scripts/check-stage6-e2e.mjs. ARCHITECTURE.md прочитан; приложение и его архитектура
+не менялись, поэтому правка этого документа не требуется.
+
+Логи текущей приёмки находятся вне репозитория: `/private/tmp/finora-stage6-repair-final-logs/`,
+`/private/tmp/finora-stage6-repair-final-compose-browser.log`,
+`/private/tmp/finora-stage6-repair-final-docker.log`,
+`/private/tmp/finora-stage6-repair-final-linux.log`. Эти пути — фактические локальные
+места диагностики macOS, не пути в коде или переносимые инструкции запуска.
+
+Статус remote: опубликованный run [34850152076](https://github.com/pw5rhn4tnn-dotcom/finora/actions/runs/34850152076)
+остаётся FAILED для HEAD `f81e4f9`; исправления не опубликованы и новый remote
+результат для них не получен. Повторный запуск старого SHA не проверил бы рабочую
+копию. Stage 6 не объявляется прошедшим remote CI. Stage 7 не начат; roadmap scope
+Stage 6 сохранён. Commit, push и изменение Git history не выполнялись.

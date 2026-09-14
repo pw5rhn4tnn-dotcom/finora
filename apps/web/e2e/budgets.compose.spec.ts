@@ -1,49 +1,12 @@
-import {
-  test,
-  expect,
-  type Page,
-  type BrowserContext,
-  type APIRequestContext,
-} from '@playwright/test';
+import { expect, type Page, type APIRequestContext } from '@playwright/test';
+import { test, login } from './budget-session';
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-test.describe.configure({ mode: 'default' });
+test.describe.configure({ mode: 'parallel' });
 const object = z.record(z.string(), z.unknown());
-let cookies: Awaited<ReturnType<BrowserContext['cookies']>> = [];
-let family: BrowserContext;
 const period = '2028-02';
 const longName = 'КатегорияДляМесячногоПланирования'.repeat(4).slice(0, 90);
-async function login(page: Page, other = false) {
-  await page.goto('/login');
-  await page
-    .getByLabel('Email', { exact: true })
-    .fill(other ? 'family@finora.example' : 'personal@finora.example');
-  await page
-    .getByLabel('Пароль', { exact: true })
-    .fill(other ? 'Finora-Family-2026!' : 'Finora-Personal-2026!');
-  await page.getByRole('button', { name: 'Войти', exact: true }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Обзор', exact: true }),
-  ).toBeVisible();
-}
-test.beforeAll(async ({ browser, baseURL }) => {
-  const personal = await browser.newContext({ baseURL });
-  try {
-    await login(await personal.newPage());
-    cookies = await personal.cookies();
-  } finally {
-    await personal.close();
-  }
-  family = await browser.newContext({ baseURL });
-  await login(await family.newPage(), true);
-});
-test.afterAll(async () => {
-  await family.close();
-});
-test.beforeEach(async ({ context }) => {
-  await context.addCookies(cookies);
-});
 async function api(
   request: APIRequestContext,
   path: string,
@@ -75,10 +38,11 @@ async function createBudget(
   request: APIRequestContext,
   categoryId: string,
   limitAmount = '100',
+  year = 2028,
 ) {
   const r = await api(request, '/budgets', 'POST', {
     categoryId,
-    year: 2028,
+    year,
     month: 2,
     limitAmount,
   });
@@ -121,6 +85,17 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 async function axe(page: Page) {
+  // После enabled/validation CSS-переходы ещё могут смешивать disabled-цвета.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter((animation) => animation.playState === 'running').length,
+      ),
+    )
+    .toBe(0);
   expect(
     (
       await new AxeBuilder({ page })
@@ -182,6 +157,7 @@ test('Stage 6 UI: login → create budget → transaction → actual → edit �
 test('Stage 6 isolation: seed User B GET/PATCH/DELETE и чужой расход не влияют на User A', async ({
   page,
   context,
+  family,
 }) => {
   const foreign = await api(family.request, '/budgets?year=2026&month=9');
   expect(foreign.status()).toBe(200);
@@ -282,58 +258,114 @@ test('Stage 6 browser errors: list retry, duplicate, draft preservation, double-
   }
   await expect(dialog).toBeHidden();
 });
-for (const [width, height] of [
-  [320, 740],
-  [390, 844],
-  [640, 320],
-  [768, 1024],
-  [1440, 960],
-  [1920, 1080],
-] as const) {
+for (const [index, [width, height]] of (
+  [
+    [320, 740],
+    [390, 844],
+    [640, 320],
+    [768, 1024],
+    [1440, 960],
+    [1920, 1080],
+  ] as const
+).entries()) {
   test(`Stage 6 responsive/a11y ${width}×${height}, длинное имя, большие суммы, Sheet, 200% text`, async ({
     page,
     context,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width, height });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const name = `${longName.slice(0, 80)}${width}${randomUUID().slice(0, 8)}`;
+    const year = 2032 + index * 4;
+    const period = `${year}-02`;
     const id = await category(context.request, name);
-    await createBudget(context.request, id, '9999999999999999.99');
-    await spending(context.request, id, '9999999999999999.98');
-    await page.goto(`/budgets?period=${period}&pageSize=50`);
-    const card = page.locator('.budget-card').filter({ hasText: name });
-    await expect(card).toContainText('Осталось 0,01 RUB');
-    await noOverflow(page);
-    await axe(page);
-    await page.screenshot({
-      path: `/private/tmp/finora-stage6-${width}-normal.png`,
-      fullPage: true,
-    });
-    await card.getByRole('button', { name: 'Изменить' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByLabel('Категория', { exact: true })).toHaveValue(
-      id,
-    );
-    await expect(dialog.getByLabel('Лимит, RUB')).toHaveValue(
-      '9999999999999999.99',
-    );
-    await noOverflow(page);
-    await axe(page);
-    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
-    await noOverflow(page);
-    await dialog
-      .getByRole('button', { name: 'Сохранить бюджет' })
-      .scrollIntoViewIfNeeded();
-    await expect(
-      dialog.getByRole('button', { name: 'Сохранить бюджет' }),
-    ).toBeInViewport();
-    await page.keyboard.press('Escape');
-    await noOverflow(page);
-    await expect(card.getByRole('button', { name: 'Изменить' })).toBeFocused();
-    await page.screenshot({
-      path: `/private/tmp/finora-stage6-${width}.png`,
-      fullPage: true,
-    });
+    let budgetId: string | undefined;
+    let transactionId: string | undefined;
+    try {
+      budgetId = z
+        .string()
+        .parse(
+          (await createBudget(context.request, id, '9999999999999999.99', year))
+            .id,
+        );
+      transactionId = z
+        .string()
+        .parse(
+          (
+            await spending(
+              context.request,
+              id,
+              '9999999999999999.98',
+              `${period}-29`,
+            )
+          ).id,
+        );
+      await page.goto(`/budgets?period=${period}&pageSize=50`);
+      const card = page.locator('.budget-card').filter({ hasText: name });
+      await expect(card).toContainText('Осталось 0,01 RUB');
+      await noOverflow(page);
+      await axe(page);
+      await page.screenshot({
+        path: testInfo.outputPath('normal.png'),
+        fullPage: true,
+      });
+      await testInfo.attach('Обычный размер текста', {
+        path: testInfo.outputPath('normal.png'),
+        contentType: 'image/png',
+      });
+      await card.getByRole('button', { name: 'Изменить' }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByLabel('Категория', { exact: true })).toHaveValue(
+        id,
+      );
+      await expect(dialog.getByLabel('Лимит, RUB')).toHaveValue(
+        '9999999999999999.99',
+      );
+      await noOverflow(page);
+      await axe(page);
+      await page.addStyleTag({
+        content: 'html { font-size: 200% !important; }',
+      });
+      await noOverflow(page);
+      await dialog
+        .getByRole('button', { name: 'Сохранить бюджет' })
+        .scrollIntoViewIfNeeded();
+      await expect(
+        dialog.getByRole('button', { name: 'Сохранить бюджет' }),
+      ).toBeInViewport();
+      await page.keyboard.press('Escape');
+      await noOverflow(page);
+      await expect(
+        card.getByRole('button', { name: 'Изменить' }),
+      ).toBeFocused();
+      await page.screenshot({
+        path: testInfo.outputPath('text-200.png'),
+        fullPage: true,
+      });
+      await testInfo.attach('Текст 200%', {
+        path: testInfo.outputPath('text-200.png'),
+        contentType: 'image/png',
+      });
+    } finally {
+      if (transactionId)
+        expect(
+          (
+            await api(
+              context.request,
+              `/transactions/${transactionId}`,
+              'DELETE',
+            )
+          ).status(),
+        ).toBe(204);
+      if (budgetId)
+        expect(
+          (
+            await api(context.request, `/budgets/${budgetId}`, 'DELETE')
+          ).status(),
+        ).toBe(204);
+      expect(
+        (await api(context.request, `/categories/${id}`, 'DELETE')).status(),
+      ).toBe(200);
+    }
   });
 }
 test('Stage 6 keyboard-only: focus, validation, trap, Escape, confirmation и empty state', async ({

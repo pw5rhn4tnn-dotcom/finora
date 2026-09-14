@@ -218,3 +218,23 @@ keyboard/focus/confirmation, axe и сохранность черновика п
 `budgets.compose.spec.ts` работает с настоящими Nginx/API/PostgreSQL; тестовые
 сетевые сбои помечены отдельно. Независимый suite использует общий только auth
 setup, данные сценариев создаются отдельно и не требуют порядка выполнения тестов.
+
+### Stage 6: переносимость и изоляция browser acceptance
+
+`pnpm test:e2e:auth` запускает прежние auth/finance tests, budgets и regression
+перезапуска workers/параллельных viewport. Только budget project зависит от
+`budgets-auth`: два входа выполняются один раз за запуск; страницы/context
+создаются заново для каждого теста. Login → «Обзор» остаётся частью UI acceptance.
+
+Screenshot normal/200% text сохраняются через `testInfo.outputPath()` и attachments.
+Compose runner выделяет уникальный каталог под игнорируемым `test-results/`.
+Для отдельных одновременно запущенных Playwright процессов задайте разные
+`FINORA_PLAYWRIGHT_OUTPUT_DIR`; параллельные test cases разделяет сам Playwright.
+StorageState setup не следует публиковать вместе с PNG: это test session cookies.
+
+При уже поднятом отдельном acceptance Compose можно запустить
+`FINORA_COMPOSE_URL=<origin> pnpm test:e2e:stage6-regression`. Runner сам удаляет
+временные copies/PNG/state, проверяет 5 заданных падений и последующие 6 успешных
+viewport, затем 12 viewport на четырёх workers. Обычный suite обязан завершиться
+без ошибок; в него намеренные падения не добавляются. Локальный PASS на macOS
+не доказывает переносимость Linux; диагностика remote run описана в REPORT.

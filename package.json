@@ -25,7 +25,8 @@
     "postinstall": "pnpm db:generate",
     "db:setup": "pnpm db:migrate && pnpm --filter @finora/api db:permissions && pnpm db:seed",
     "test:e2e": "pnpm --filter @finora/web test:e2e",
-    "test:e2e:auth": "node scripts/test-docker.mjs --browser"
+    "test:e2e:auth": "node scripts/test-docker.mjs --browser",
+    "test:e2e:stage6-regression": "node scripts/check-stage6-e2e.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

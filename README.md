@@ -235,7 +235,9 @@ build, Playwright/axe UI smoke, проверку OpenAPI generation и auth E2E 
 включая build обоих images. Тестовые данные воспроизводимы, developer machine не нужна.
 
 **По данным пользователя, Stage 5 (`352d4cb`) прошёл GitHub Actions.**
-Результаты локального CI-equivalent Stage 6 записаны в REPORT. Commit/push
+Результаты локальных прогонов команд CI Stage 6 записаны в REPORT. Успех на macOS
+не гарантирует успех host-side scripts/Playwright в Linux GitHub Actions;
+текущий repair pass после remote FAILED описан отдельно. Commit/push
 текущей рабочей версии не выполнялись; remote CI для неё не запускался.
 
 ## UI foundation

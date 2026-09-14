@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0–6 завершены. Stage 5 (`352d4cb`) опубликован; по данным пользователя remote GitHub Actions успешно завершён. Stage 6 — Budgets прошёл полный локальный CI-equivalent, Docker и browser acceptance после self-review; commit/push не выполнялись. Stage 7–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0–5 завершены. Stage 6 реализован, но remote GitHub Actions run `34850152076` завершился FAILED; repair/review прошёл локальные команды CI, Docker и browser acceptance на macOS и budget/regression проверки Linux без root. Повторный remote green ещё не подтверждён; scope не расширен. Локальная проверка команд CI на macOS не доказывает эквивалентность Linux runner. Stage 7–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -106,7 +106,7 @@ CI зелёный. Schema/baseline и deterministic seed dataset сохране�
 архивирование, деньги/rate snapshots, ownership, фильтры/поиск/сортировки/pagination,
 Sheet формы и atomic audit реализованы. Schema и достаточный rich seed сохранены.
 42 backend tests (с родительскими node:test), 47 frontend tests, 15 shell E2E и
-18 Compose E2E (11 auth + 7 finance) прошли. Полный локальный CI-equivalent,
+18 Compose E2E (11 auth + 7 finance) прошли. Полный локальный набор команд CI на macOS,
 Docker clean/repeated startup, DB recovery и persistence после mutations — PASS.
 Отдельный self-review выполнен, исправления проверены повторно. Stage 5 затем
 закоммичен и опубликован (`352d4cb`); по данным пользователя remote CI прошёл.
@@ -128,7 +128,7 @@ Docker clean/repeated startup, DB recovery и persistence после mutations �
 
 ## Stage 6 — Budgets
 
-**Статус:** завершён локально. Финальные проверки после self-review: backend 61/61, frontend 65/65, shell E2E 15/15, Compose browser 30/30 без retries; отдельный Docker acceptance — PASS. Подробности и промежуточные дефекты записаны в REPORT. Новая migration/seed не потребовалась; OpenAPI/Orval обновлены. Изменения не закоммичены и не отправлены.
+**Статус:** repair/review после FAILED remote CI проверен локально: 61 backend / 65 frontend / 15 shell / 18 auth+finance / 12 budgets + setup, полный Docker и worker/artifact regressions — Passed. Budgets/regressions дополнительно Passed в Linux без root и без /private/tmp. Повторный remote green не подтверждён, исправления не опубликованы; Stage 7 не начат. Диагностика и ограничения — в REPORT. Scope, schema, migration и seed не меняются.
 
 **Цель:** добавить месячное планирование расходов и видимый прогресс.
 
