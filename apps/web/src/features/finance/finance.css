@@ -6,6 +6,55 @@
   color: var(--color-success);
   overflow-wrap: anywhere;
 }
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: calc(var(--spacing) * 4);
+}
+.budget-card {
+  min-width: 0;
+  padding: calc(var(--spacing) * 4);
+  display: grid;
+  align-content: start;
+  gap: calc(var(--spacing) * 4);
+  overflow-wrap: anywhere;
+}
+.budget-card h2 {
+  font-size: var(--text-body);
+}
+.budget-progress {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  min-width: 0;
+}
+.budget-progress__track {
+  height: 0.625rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-border);
+}
+.budget-progress__track span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+.budget-progress--over .budget-progress__track span {
+  background: var(--color-expense);
+}
+.budget-progress--over .budget-progress__state {
+  color: var(--color-expense);
+  font-weight: 600;
+}
+.budget-period {
+  display: flex;
+  align-items: end;
+  gap: calc(var(--spacing) * 4);
+  flex-wrap: wrap;
+}
+.budget-period .field {
+  min-width: 0;
+  max-width: 100%;
+}
 .finance-form,
 .finance-filter-fields {
   display: grid;

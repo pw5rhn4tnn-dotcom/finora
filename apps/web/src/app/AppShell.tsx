@@ -11,6 +11,7 @@ import { navigation } from './navigation-config';
 export function AppShell() {
   const location = useLocation();
   const previousPath = useRef(location.pathname);
+  const scrollBody = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const current = navigation.find((item) => item.to === location.pathname);
     const title =
@@ -24,13 +25,14 @@ export function AppShell() {
     if (previousPath.current !== location.pathname || location.state) {
       document.getElementById('main-content')?.focus();
       window.scrollTo({ top: 0, behavior: 'instant' });
+      if (scrollBody.current) scrollBody.current.scrollTop = 0;
       previousPath.current = location.pathname;
     }
   }, [location.pathname, location.state]);
   return (
     <div className="app-shell">
       <Sidebar />
-      <div className="shell-body">
+      <div className="shell-body" ref={scrollBody}>
         <header className="topbar">
           <div className="topbar__mobile-brand">
             <Brand />

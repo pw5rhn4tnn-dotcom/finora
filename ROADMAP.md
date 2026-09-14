@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0–5 завершены. Stage 5 — Categories & Transactions Core полностью завершён локально: полный CI-equivalent, отдельный self-review и повторные проверки пройдены. По данным пользователя последний remote GitHub Actions после Stage 4 был зелёным; Stage 5 не публиковался, commit/push не выполнялись. Stage 6–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0–6 завершены. Stage 5 (`352d4cb`) опубликован; по данным пользователя remote GitHub Actions успешно завершён. Stage 6 — Budgets прошёл полный локальный CI-equivalent, Docker и browser acceptance после self-review; commit/push не выполнялись. Stage 7–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -108,8 +108,9 @@ Sheet формы и atomic audit реализованы. Schema и достат�
 42 backend tests (с родительскими node:test), 47 frontend tests, 15 shell E2E и
 18 Compose E2E (11 auth + 7 finance) прошли. Полный локальный CI-equivalent,
 Docker clean/repeated startup, DB recovery и persistence после mutations — PASS.
-Отдельный self-review выполнен, исправления проверены повторно. Stage 6 не начат.
-Commit/push не выполнялись; remote-run Stage 5 не заявляется. Детали — в REPORT.
+Отдельный self-review выполнен, исправления проверены повторно. Stage 5 затем
+закоммичен и опубликован (`352d4cb`); по данным пользователя remote CI прошёл.
+Текущий Stage 6 описан ниже. История локальной приёмки — в REPORT.
 
 **Цель:** получить полноценный ежедневный учет с корректной валютной моделью.
 
@@ -126,6 +127,8 @@ Commit/push не выполнялись; remote-run Stage 5 не заявляе�
 **Документация / REPORT:** контракты/генерация клиента и Swagger, результаты financial/ownership проверок, фактический seed и изменения UX.
 
 ## Stage 6 — Budgets
+
+**Статус:** завершён локально. Финальные проверки после self-review: backend 61/61, frontend 65/65, shell E2E 15/15, Compose browser 30/30 без retries; отдельный Docker acceptance — PASS. Подробности и промежуточные дефекты записаны в REPORT. Новая migration/seed не потребовалась; OpenAPI/Orval обновлены. Изменения не закоммичены и не отправлены.
 
 **Цель:** добавить месячное планирование расходов и видимый прогресс.
 

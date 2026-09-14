@@ -6,7 +6,7 @@ export class AuditWriter {
   async write(
     db: Prisma.TransactionClient,
     userId: string,
-    entityType: 'Category' | 'Transaction' | 'RecurringTransaction',
+    entityType: 'Budget' | 'Category' | 'Transaction' | 'RecurringTransaction',
     entityId: string,
     action: 'CREATE' | 'UPDATE' | 'DELETE' | 'ARCHIVE',
     before: Prisma.InputJsonObject | null,

@@ -1,10 +1,12 @@
 @layer components {
   .app-shell {
     @apply flex min-h-dvh flex-col;
+    height: 100dvh;
   }
   .shell-body {
     @apply flex min-w-0 flex-1 flex-col;
-    min-height: calc(100dvh - var(--bottom-nav-height));
+    min-height: 0;
+    overflow-y: auto;
   }
   .shell-body main {
     @apply min-w-0 flex-1;
@@ -30,7 +32,7 @@
     @apply hidden;
   }
   .topbar {
-    @apply flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4;
+    @apply flex min-h-20 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4;
   }
   .topbar__desktop-label {
     @apply hidden text-secondary text-text-secondary;
@@ -115,6 +117,9 @@
 }
 
 @media (width >= theme(--breakpoint-tablet)) {
+  .app-shell {
+    height: auto;
+  }
   .sidebar {
     @apply fixed inset-y-0 left-0 flex flex-col gap-10 overflow-y-auto border-r border-border bg-surface px-4 py-7;
     width: var(--sidebar-width);
@@ -146,6 +151,7 @@
   .shell-body {
     margin-left: var(--sidebar-width);
     min-height: 100dvh;
+    overflow-y: visible;
     padding-bottom: 0;
   }
   .bottom-navigation,

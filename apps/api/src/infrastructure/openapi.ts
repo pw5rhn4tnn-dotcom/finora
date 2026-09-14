@@ -14,9 +14,9 @@ export function createOpenApi(app: INestApplication) {
     new DocumentBuilder()
       .setTitle('Finora API')
       .setDescription(
-        'Finora: авторизация, настройки, категории и операции. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.',
+        'Finora: авторизация, настройки, категории, операции и месячные бюджеты. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.',
       )
-      .setVersion('0.5.0')
+      .setVersion('0.6.0')
       .addCookieAuth('finora_session')
       .build(),
     { extraModels: [ProblemDto] },
@@ -29,6 +29,8 @@ export function createOpenApi(app: INestApplication) {
     'CategoryPatchDto',
     'TransactionInputDto',
     'TransactionPatchDto',
+    'BudgetInputDto',
+    'BudgetPatchDto',
   ]) {
     const schema = document.components?.schemas?.[name];
     if (schema && !('$ref' in schema)) schema.additionalProperties = false;

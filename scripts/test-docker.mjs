@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { financeAcceptance } from './finance-acceptance.mjs';
+import { budgetAcceptance } from './budget-acceptance.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, copyFile, rm } from 'node:fs/promises';
@@ -193,6 +194,7 @@ try {
   env.AUTH_ORIGINS = financeUrl;
   await compose('up', '-d', '--wait', '--wait-timeout', '180', 'api');
   await financeAcceptance(financeUrl, compose, databaseHash);
+  await budgetAcceptance(financeUrl, compose, databaseHash);
   if (process.argv.includes('--browser')) {
     // Сначала сохранены все прежние проверки dataset/readiness/restart.
     const browserUrl = `http://${(await compose('port', 'web', '80')).trim()}`;
@@ -200,7 +202,15 @@ try {
     await compose('up', '-d', '--wait', '--wait-timeout', '180', 'api');
     const result = await exec(
       'pnpm',
-      ['--filter', '@finora/web', 'exec', 'playwright', 'test'],
+      [
+        '--filter',
+        '@finora/web',
+        'exec',
+        'playwright',
+        'test',
+        'auth.compose.spec.ts',
+        'finance.compose.spec.ts',
+      ],
       {
         env: { ...process.env, FINORA_COMPOSE_URL: browserUrl },
         maxBuffer: 16 * 1024 * 1024,
@@ -208,6 +218,26 @@ try {
       },
     );
     console.log(result.stdout);
+    // Независимый Stage 6 suite получает свежий auth limiter; production policy не меняется.
+    await compose('restart', 'api');
+    await compose('up', '-d', '--wait', '--wait-timeout', '180');
+    const budgets = await exec(
+      'pnpm',
+      [
+        '--filter',
+        '@finora/web',
+        'exec',
+        'playwright',
+        'test',
+        'budgets.compose.spec.ts',
+      ],
+      {
+        env: { ...process.env, FINORA_COMPOSE_URL: browserUrl },
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: 300000,
+      },
+    );
+    console.log(budgets.stdout);
   }
   console.log(
     `PASS: clean/repeated startup, seed ×3, DB outage/recovery; dataset SHA-256 ${before}`,

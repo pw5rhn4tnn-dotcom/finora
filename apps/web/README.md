@@ -1,7 +1,7 @@
 # Frontend Finora · Stage 3–5
 
 Работающая адаптивная оболочка, общие UI primitives и светлая тема.
-Stage 4 реализует авторизацию и настройки профиля. Stage 5 добавляет реальные категории и операции. Остальные финансовые разделы ещё не реализованы. Разделы явно обозначены
+Stage 4 реализует авторизацию и настройки профиля. Stage 5 добавляет реальные категории и операции, Stage 6 — месячные бюджеты. Остальные финансовые разделы ещё не реализованы. Разделы явно обозначены
 как предварительный просмотр. Главный экран не использует seed и не показывает
 вымышленные финансовые показатели.
 
@@ -197,3 +197,24 @@ FINORA_COMPOSE_URL Playwright запускает все *.compose.spec.ts; shell
 self-review. Desktop filters учитывают ширину контейнера; при недостатке места
 доступен Sheet. Category grid, labels, PageHeader и прокрутка Sheet проверены
 при 200% текста. Подробный журнал проверок и ограничения — в ../../REPORT.md.
+
+## Stage 6 — Budgets
+
+`BudgetsPage` собирает monthly query, URL period/pagination, карточки и page-owned
+`BudgetSheet`. `BudgetForm`, `BudgetMonthPicker`, `BudgetProgress` используют общие
+finance helpers и shared UI. Денежные API types приходят из Orval, raw fetch и
+клиентские финансовые aggregates не добавлены. `Number(progress)` применяется
+только для ширины/ARIA полосы; spent/remaining/percent предоставлены сервером.
+
+Состояния: loading, empty, populated, error/retry, field errors, pending, success,
+confirmation, zero/partial/exact/over-budget. Синхронный submission ref блокирует
+двойной submit и Escape до завершения запроса; ошибки сохраняют draft. Поздняя
+загрузка category options не теряет выбранную историческую категорию.
+
+После выявленного axe target-size дефекта на длинном budget list мобильный shell
+прокручивает содержимое отдельно над bottom navigation. Desktop document scroll
+сохранён. Browser tests проверяют шесть заданных размеров, 200% text, reduced motion,
+keyboard/focus/confirmation, axe и сохранность черновика при server error.
+`budgets.compose.spec.ts` работает с настоящими Nginx/API/PostgreSQL; тестовые
+сетевые сбои помечены отдельно. Независимый suite использует общий только auth
+setup, данные сценариев создаются отдельно и не требуют порядка выполнения тестов.

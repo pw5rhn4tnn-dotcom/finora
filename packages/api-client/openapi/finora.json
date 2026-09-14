@@ -2230,12 +2230,631 @@
           "Транзакции"
         ]
       }
+    },
+    "/api/v1/budgets": {
+      "get": {
+        "operationId": "budgetsList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Номер страницы от 1",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9999999,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Размер страницы",
+            "schema": {
+              "default": 25,
+              "type": "number",
+              "enum": [
+                10,
+                25,
+                50
+              ]
+            }
+          },
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "description": "Год выбранного месяца, обязателен",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9999,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "description": "Месяц 1–12, обязателен; без ведущего нуля",
+            "schema": {
+              "minimum": 1,
+              "maximum": 12,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Список собственных записей с серверной пагинацией",
+        "tags": [
+          "Бюджеты"
+        ]
+      },
+      "post": {
+        "operationId": "budgetsCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Создать запись с атомарным аудитом",
+        "tags": [
+          "Бюджеты"
+        ]
+      }
+    },
+    "/api/v1/budgets/{id}": {
+      "get": {
+        "operationId": "budgetsGet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Получить собственную запись",
+        "tags": [
+          "Бюджеты"
+        ]
+      },
+      "patch": {
+        "operationId": "budgetsUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetPatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Изменить собственную запись; требуется хотя бы одно разрешённое поле",
+        "tags": [
+          "Бюджеты"
+        ]
+      },
+      "delete": {
+        "operationId": "budgetsDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Бюджет удалён, история сохранена"
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Удалить собственную запись с сохранением аудита",
+        "tags": [
+          "Бюджеты"
+        ]
+      }
     }
   },
   "info": {
     "title": "Finora API",
-    "description": "Finora: авторизация, настройки, категории и операции. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.",
-    "version": "0.5.0",
+    "description": "Finora: авторизация, настройки, категории, операции и месячные бюджеты. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.",
+    "version": "0.6.0",
     "contact": {}
   },
   "tags": [],
@@ -2913,6 +3532,186 @@
             "description": "Описание; пробелы по краям удаляются",
             "minLength": 1,
             "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "BudgetDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Календарный год",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "month": {
+            "type": "integer",
+            "description": "Календарный месяц",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "limitAmount": {
+            "type": "string",
+            "description": "Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
+          },
+          "id": {
+            "type": "string",
+            "description": "Идентификатор бюджета",
+            "format": "uuid"
+          },
+          "category": {
+            "description": "Категория, включая архивную",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "Основная валюта владельца"
+          },
+          "spent": {
+            "type": "string",
+            "description": "Сумма расходов в основной валюте за календарный месяц по DATE; все операции категории, независимо от пагинации",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          },
+          "remaining": {
+            "type": "string",
+            "description": "Лимит минус расходы; отрицательный остаток означает превышение",
+            "pattern": "^-?\\d+(\\.\\d+)?$"
+          },
+          "overBudget": {
+            "type": "boolean",
+            "description": "Расходы строго больше лимита"
+          },
+          "progress": {
+            "type": "string",
+            "description": "Использование в процентах, строка с 2 знаками HALF_UP; может быть больше 100",
+            "pattern": "^\\d+\\.\\d{2}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Создан",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Изменён",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "categoryId",
+          "year",
+          "month",
+          "limitAmount",
+          "id",
+          "category",
+          "currency",
+          "spent",
+          "remaining",
+          "overBudget",
+          "progress",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "BudgetPageDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Номер страницы"
+          },
+          "pageSize": {
+            "type": "number",
+            "description": "Размер страницы"
+          },
+          "total": {
+            "type": "number",
+            "description": "Всего собственных записей после фильтрации"
+          },
+          "items": {
+            "description": "Бюджеты выбранного месяца",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "BudgetInputDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Календарный год",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "month": {
+            "type": "integer",
+            "description": "Календарный месяц",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "limitAmount": {
+            "type": "string",
+            "description": "Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
+          }
+        },
+        "required": [
+          "categoryId",
+          "year",
+          "month",
+          "limitAmount"
+        ],
+        "additionalProperties": false
+      },
+      "BudgetPatchDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита",
+            "format": "uuid"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Календарный год",
+            "minimum": 1,
+            "maximum": 9999
+          },
+          "month": {
+            "type": "integer",
+            "description": "Календарный месяц",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "limitAmount": {
+            "type": "string",
+            "description": "Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
           }
         },
         "additionalProperties": false

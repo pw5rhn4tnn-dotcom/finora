@@ -460,6 +460,110 @@ export interface TransactionPatchDto {
   description?: string;
 }
 
+export interface BudgetDto {
+  /** Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита */
+  categoryId: string;
+  /**
+     * Календарный год
+     * @minimum 1
+     * @maximum 9999
+     */
+  year: number;
+  /**
+     * Календарный месяц
+     * @minimum 1
+     * @maximum 12
+     */
+  month: number;
+  /**
+     * Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  limitAmount: string;
+  /** Идентификатор бюджета */
+  id: string;
+  /** Категория, включая архивную */
+  category: CategoryDto;
+  /** Основная валюта владельца */
+  currency: string;
+  /**
+     * Сумма расходов в основной валюте за календарный месяц по DATE; все операции категории, независимо от пагинации
+     * @pattern ^\d+(\.\d+)?$
+     */
+  spent: string;
+  /**
+     * Лимит минус расходы; отрицательный остаток означает превышение
+     * @pattern ^-?\d+(\.\d+)?$
+     */
+  remaining: string;
+  /** Расходы строго больше лимита */
+  overBudget: boolean;
+  /**
+     * Использование в процентах, строка с 2 знаками HALF_UP; может быть больше 100
+     * @pattern ^\d+\.\d{2}$
+     */
+  progress: string;
+  /** Создан */
+  createdAt: string;
+  /** Изменён */
+  updatedAt: string;
+}
+
+export interface BudgetPageDto {
+  /** Номер страницы */
+  page: number;
+  /** Размер страницы */
+  pageSize: number;
+  /** Всего собственных записей после фильтрации */
+  total: number;
+  /** Бюджеты выбранного месяца */
+  items: BudgetDto[];
+}
+
+export interface BudgetInputDto {
+  /** Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита */
+  categoryId: string;
+  /**
+     * Календарный год
+     * @minimum 1
+     * @maximum 9999
+     */
+  year: number;
+  /**
+     * Календарный месяц
+     * @minimum 1
+     * @maximum 12
+     */
+  month: number;
+  /**
+     * Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  limitAmount: string;
+}
+
+export interface BudgetPatchDto {
+  /** Собственная активная expense-категория; прежняя архивная связь сохраняется при изменении лимита */
+  categoryId?: string;
+  /**
+     * Календарный год
+     * @minimum 1
+     * @maximum 9999
+     */
+  year?: number;
+  /**
+     * Календарный месяц
+     * @minimum 1
+     * @maximum 12
+     */
+  month?: number;
+  /**
+     * Положительный лимит в основной валюте; точность валюты из /settings/options, максимум 16 целых знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  limitAmount?: string;
+}
+
 export type CategoriesListParams = {
 /**
  * Номер страницы от 1
@@ -573,6 +677,40 @@ export const TransactionsListSort = {
   oldest: 'oldest',
   amountDesc: 'amountDesc',
   amountAsc: 'amountAsc',
+} as const;
+
+export type BudgetsListParams = {
+/**
+ * Номер страницы от 1
+ * @minimum 1
+ * @maximum 9999999
+ */
+page?: number;
+/**
+ * Размер страницы
+ */
+pageSize?: BudgetsListPageSize;
+/**
+ * Год выбранного месяца, обязателен
+ * @minimum 1
+ * @maximum 9999
+ */
+year: number;
+/**
+ * Месяц 1–12, обязателен; без ведущего нуля
+ * @minimum 1
+ * @maximum 12
+ */
+month: number;
+};
+
+export type BudgetsListPageSize = typeof BudgetsListPageSize[keyof typeof BudgetsListPageSize];
+
+
+export const BudgetsListPageSize = {
+  NUMBER_10: 10,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
 } as const;
 
 export type healthLiveResponse200 = {
@@ -2308,4 +2446,465 @@ export const transactionsDelete = async (id: string, options?: RequestInit): Pro
 
   const data: transactionsDeleteResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as transactionsDeleteResponse
+}
+
+
+
+export type budgetsListResponse200 = {
+  data: BudgetPageDto
+  status: 200
+}
+
+export type budgetsListResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type budgetsListResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type budgetsListResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type budgetsListResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type budgetsListResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type budgetsListResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type budgetsListResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type budgetsListResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type budgetsListResponseSuccess = (budgetsListResponse200) & {
+  headers: Headers;
+};
+export type budgetsListResponseError = (budgetsListResponse400 | budgetsListResponse401 | budgetsListResponse403 | budgetsListResponse404 | budgetsListResponse409 | budgetsListResponse413 | budgetsListResponse429 | budgetsListResponse500) & {
+  headers: Headers;
+};
+
+export type budgetsListResponse = (budgetsListResponseSuccess | budgetsListResponseError)
+
+export const getBudgetsListUrl = (params: BudgetsListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/budgets?${stringifiedParams}` : `/api/v1/budgets`
+}
+
+/**
+ * @summary Список собственных записей с серверной пагинацией
+ */
+export const budgetsList = async (params: BudgetsListParams, options?: RequestInit): Promise<budgetsListResponse> => {
+
+  const res = await fetch(getBudgetsListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: budgetsListResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as budgetsListResponse
+}
+
+
+
+export type budgetsCreateResponse201 = {
+  data: BudgetDto
+  status: 201
+}
+
+export type budgetsCreateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type budgetsCreateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type budgetsCreateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type budgetsCreateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type budgetsCreateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type budgetsCreateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type budgetsCreateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type budgetsCreateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type budgetsCreateResponseSuccess = (budgetsCreateResponse201) & {
+  headers: Headers;
+};
+export type budgetsCreateResponseError = (budgetsCreateResponse400 | budgetsCreateResponse401 | budgetsCreateResponse403 | budgetsCreateResponse404 | budgetsCreateResponse409 | budgetsCreateResponse413 | budgetsCreateResponse429 | budgetsCreateResponse500) & {
+  headers: Headers;
+};
+
+export type budgetsCreateResponse = (budgetsCreateResponseSuccess | budgetsCreateResponseError)
+
+export const getBudgetsCreateUrl = () => {
+
+
+
+
+  return `/api/v1/budgets`
+}
+
+/**
+ * @summary Создать запись с атомарным аудитом
+ */
+export const budgetsCreate = async (budgetInputDto: BudgetInputDto, options?: RequestInit): Promise<budgetsCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getBudgetsCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(budgetInputDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: budgetsCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as budgetsCreateResponse
+}
+
+
+
+export type budgetsGetResponse200 = {
+  data: BudgetDto
+  status: 200
+}
+
+export type budgetsGetResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type budgetsGetResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type budgetsGetResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type budgetsGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type budgetsGetResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type budgetsGetResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type budgetsGetResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type budgetsGetResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type budgetsGetResponseSuccess = (budgetsGetResponse200) & {
+  headers: Headers;
+};
+export type budgetsGetResponseError = (budgetsGetResponse400 | budgetsGetResponse401 | budgetsGetResponse403 | budgetsGetResponse404 | budgetsGetResponse409 | budgetsGetResponse413 | budgetsGetResponse429 | budgetsGetResponse500) & {
+  headers: Headers;
+};
+
+export type budgetsGetResponse = (budgetsGetResponseSuccess | budgetsGetResponseError)
+
+export const getBudgetsGetUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/budgets/${id}`
+}
+
+/**
+ * @summary Получить собственную запись
+ */
+export const budgetsGet = async (id: string, options?: RequestInit): Promise<budgetsGetResponse> => {
+
+  const res = await fetch(getBudgetsGetUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: budgetsGetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as budgetsGetResponse
+}
+
+
+
+export type budgetsUpdateResponse200 = {
+  data: BudgetDto
+  status: 200
+}
+
+export type budgetsUpdateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type budgetsUpdateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type budgetsUpdateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type budgetsUpdateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type budgetsUpdateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type budgetsUpdateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type budgetsUpdateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type budgetsUpdateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type budgetsUpdateResponseSuccess = (budgetsUpdateResponse200) & {
+  headers: Headers;
+};
+export type budgetsUpdateResponseError = (budgetsUpdateResponse400 | budgetsUpdateResponse401 | budgetsUpdateResponse403 | budgetsUpdateResponse404 | budgetsUpdateResponse409 | budgetsUpdateResponse413 | budgetsUpdateResponse429 | budgetsUpdateResponse500) & {
+  headers: Headers;
+};
+
+export type budgetsUpdateResponse = (budgetsUpdateResponseSuccess | budgetsUpdateResponseError)
+
+export const getBudgetsUpdateUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/budgets/${id}`
+}
+
+/**
+ * @summary Изменить собственную запись; требуется хотя бы одно разрешённое поле
+ */
+export const budgetsUpdate = async (id: string,
+    budgetPatchDto: BudgetPatchDto, options?: RequestInit): Promise<budgetsUpdateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getBudgetsUpdateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(budgetPatchDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: budgetsUpdateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as budgetsUpdateResponse
+}
+
+
+
+export type budgetsDeleteResponse204 = {
+  data: void
+  status: 204
+}
+
+export type budgetsDeleteResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type budgetsDeleteResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type budgetsDeleteResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type budgetsDeleteResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type budgetsDeleteResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type budgetsDeleteResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type budgetsDeleteResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type budgetsDeleteResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type budgetsDeleteResponseSuccess = (budgetsDeleteResponse204) & {
+  headers: Headers;
+};
+export type budgetsDeleteResponseError = (budgetsDeleteResponse400 | budgetsDeleteResponse401 | budgetsDeleteResponse403 | budgetsDeleteResponse404 | budgetsDeleteResponse409 | budgetsDeleteResponse413 | budgetsDeleteResponse429 | budgetsDeleteResponse500) & {
+  headers: Headers;
+};
+
+export type budgetsDeleteResponse = (budgetsDeleteResponseSuccess | budgetsDeleteResponseError)
+
+export const getBudgetsDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/budgets/${id}`
+}
+
+/**
+ * @summary Удалить собственную запись с сохранением аудита
+ */
+export const budgetsDelete = async (id: string, options?: RequestInit): Promise<budgetsDeleteResponse> => {
+
+  const res = await fetch(getBudgetsDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: budgetsDeleteResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as budgetsDeleteResponse
 }

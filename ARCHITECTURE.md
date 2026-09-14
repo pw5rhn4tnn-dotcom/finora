@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1–5; результаты приёмки Stage 5 — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Бюджеты, analytics, scheduler, CSV и audit UI Stage 6+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–6; результаты приёмки Stage 5–6 — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Analytics, scheduler, CSV и audit UI Stage 7+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -527,4 +527,45 @@ Skip link находится в AuthBoundary и остаётся доступн�
 и удаление принадлежат странице через ActiveFinanceSheet; изменение query или
 исчезновение строки не уничтожает открытый черновик. Focus возвращается trigger,
 а если строки больше нет — main. Pending блокирует повтор и закрытие панели.
-Stage 6 и интерфейс audit отсутствуют.
+На момент завершения Stage 5 бюджеты и интерфейс audit отсутствовали;
+реализованный позднее Stage 6 описан ниже.
+
+## 30. Реализованный Stage 6 — Budgets
+
+BudgetsModule использует прежние PrismaModule/AuditWriter/lockOwner. Новая таблица,
+индекс, migration или dependency не требуются: baseline уже содержит compound owner
+FK, positive/non-NaN limit, month CHECK, unique `(userId, categoryId, year, month)`
+и monthly index. DTO strict; owner только из CurrentUser. Мутации под FOR UPDATE
+владельца сериализованы со Stage 5 category/transaction writes и сменой baseCurrency.
+Конфликт UNIQUE модели Budget переводится в 409; ошибки audit не маскируются под
+пользовательский дубликат. Snapshot содержит разрешённые поля и имя категории,
+CREATE/UPDATE/DELETE атомарны с writer, включая rollback после audit INSERT.
+
+GET list/detail используют RepeatableRead. Страница бюджетов и total согласованы;
+один transaction GROUP BY по категориям страницы, владельцу, EXPENSE и полуоткрытому
+DATE-диапазону месяца обеспечивает spent без N+1 и без загрузки истории в память.
+Остаток/процент считаются отдельным Decimal constructor precision 60; проценты
+округляются HALF_UP до 2 знаков. API decimal strings не ограничены storage range
+отдельной операции для агрегатов. Год 1–9999 и месяц 1–12 передаются явно, UTC Date —
+только носитель календарных компонентов для Prisma, включая годы 1–99 и переход
+декабря 9999. Timestamp создания операции не участвует в использовании бюджета.
+
+Архивная категория сохраняет прежнюю пару category/period при редактировании лимита;
+выбор другой категории или периода проверяется как новая связь с активной expense
+category. Это сохраняет исторические budgets и запрет новых budgets в архиве.
+Ни rollover, ни дополнительные правила доходов/прогнозов не вводятся.
+
+Frontend использует generated Orval client и прежнюю finance mutation boundary.
+Query keys включают owner/year/month/page/pageSize, операция инвалидирует бюджеты
+вместе с finance queries. Sheet принадлежит странице и хранит черновик отдельно от
+перечитываемого списка. Синхронный общий ref-lock защищает от двойного submit и
+закрытия в промежутке до уведомления Query observer. Категория формы контролируется
+RHF state, поэтому загрузка options не теряет исходный выбор. Month picker состоит
+из русских Select/Input; текущий месяц вычисляется по timezone профиля.
+
+Для устранения реально воспроизведённого перекрытия budget touch targets мобильный
+shell получил отдельную прокрутку содержимого над bottom navigation. Навигация
+остаётся в flex flow, занимает фактическую высоту при 200% text; route change
+сбрасывает scrollTop содержимого. Шапка не сжимается flex-контейнером: её высота
+сохраняет перенесённую строку профиля внутри границ. Desktop остаётся с document scroll. Проверены
+прежние shell/auth/finance browser suites. Это исправление layout, без новой UI-системы.

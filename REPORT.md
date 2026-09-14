@@ -1068,3 +1068,147 @@ ARCHITECTURE, ROADMAP, web README, REPORT и название CI шага.
 
 Stage 5 завершён. Stage 6 не начинался. Commit/push и изменение Git history
 не выполнялись. Remote CI для этой незакоммиченной версии не запускался.
+
+## Stage 6 — Budgets
+
+Задание: выполнить только Stage 6, без commit/push и изменения history; законченный
+budget workflow, реальная PostgreSQL/Compose, browser acceptance, self-review и
+полный локальный CI-equivalent. Использован Codex с локальными shell/patch tools;
+новые зависимости не добавлялись, sub-agents не запускались.
+
+Исследованы PROJECT, DISCOVERY, AI_RULES, ARCHITECTURE, ROADMAP и текущие README/REPORT,
+CI, Compose runner, Prisma schema/migration/seed, Stage 4 auth/settings и Stage 5
+finance/audit/client/UI/tests. Исходная рабочая копия была чистой; HEAD `352d4cb`
+содержал Stage 5. По сообщению пользователя Stage 5 опубликован и remote CI зелёный;
+старые записи документов о непубликации относятся к моменту завершения предыдущей
+локальной работы, а не к текущему состоянию.
+
+Scope из ROADMAP: CRUD expense-бюджетов, календарный месяц, лимит в baseCurrency,
+серверная агрегация расходов, progress/over-budget, атомарный audit и demo-состояния
+около/сверх лимита. Имеющиеся 16 seed budgets уже обеспечивают эти состояния:
+перезаписывать seed и создавать дополнительную migration не требовалось.
+
+Промежуточные результаты (не итоговая приёмка): backend 57/57, frontend 62/62.
+Frozen install сначала не прошёл sandbox DNS; повтор с разрешённой сетью успешно
+выполнил установку по прежнему lockfile и Prisma generate. Исправлены ошибки типов
+и lint в новых тестах; неполные Problem Details fixtures давали generic client error,
+fixtures приведены к существующему контракту без ослабления validation.
+
+Первый Compose browser run: Stage 4/5 18/18; Stage 6 8/10. Найдены реальные дефекты:
+панель могла закрыться по Escape между началом submit и обновлением Query observer;
+sticky mobile navigation перекрывала часть touch targets длинного списка. Форма и
+панель теперь разделяют синхронный ref-lock отправки; мобильный shell выделяет
+прокручиваемую область над навигацией, route change сбрасывает её scrollTop.
+Повтор Stage 4/5 18/18; Stage 6 9/10: исправления подтверждены, оставшееся падение
+keyboard-теста вызвано нажатием Tab до загрузки options/включения submit. Тест теперь
+ожидает реальный enabled state, без увеличения timeout/retries. Визуальная проверка
+также обнаружила английское системное название месяца в native month input;
+выбор периода заменён русскими Select/Input из существующих primitives.
+
+### Отдельный self-review после первого полного зелёного набора
+
+Первый полный набор до review: 57 backend, 62 frontend, 15 shell E2E, 18 Stage 4/5
+Compose browser + 10 Stage 6 browser; отдельный Docker job — PASS. Все browser
+прогоны без retries. Self-review отдельно проверил новые service/DTO/validation,
+finance mutation integration, формы, accessibility, CSS, тесты и generated output.
+
+Найдено и исправлено:
+
+- Перехват любого P2002 внутри budget transaction маскировал технический duplicate
+  audit INSERT под 409 бюджета. Новый real DB regression сначала получил 409 вместо
+  ожидаемого безопасного 500; обработка сужена до Prisma modelName Budget. Проверены
+  неизменность business state и отсутствие SQL/Prisma в Problem response.
+- Поздняя загрузка category options оставляла native select визуально пустым при
+  редактировании. Новый component test для исторической архивной категории упал
+  на пустом value; controlled value из RHF устранил проблему. Добавлена browser
+  проверка для обычной и архивной категории.
+- Shell-only suite при переходе на новый маршрут пытался обратиться к отсутствующему
+  API. Добавлен явный budget fixture по прежней схеме изолированных shell tests;
+  настоящие бюджетные сценарии остаются в Compose suite.
+
+Дополнены regressions: смена категории/суммы операции, перенос категории/периода
+бюджета, archive/create race, стабильная пагинация 35 бюджетов, 10000 операций,
+повтор формы после ошибки с Escape, выбор месяца по-русски, keyboard confirmation
+и focus после удаления строки. Удерживаемый сетевой запрос в E2E освобождается
+в finally. Отступ карточки уменьшен в пределах существующих tokens для читаемости
+кнопок при 320px/200% text.
+
+Затронутые проверки после исправлений: budget backend suite 19/19 (включая parent),
+frontend 65/65, lint и typecheck пройдены. На 10000 операций SQL GROUP BY обработал
+5000 строк нужного месяца через существующий transactions_userId_type_transactionDate_idx;
+первый EXPLAIN ANALYZE: Planning 0.085 ms, Execution 0.885 ms, shared hit=113.
+Это локальный замер на тестовой БД, не SLA. ORM выполняет один агрегирующий запрос
+на категории страницы; число запросов не растёт по одному на бюджет. Данные чужих
+владельцев и других месяцев отсекаются в PostgreSQL. Индексы/модель не менялись.
+
+Повторная полная финальная приёмка выполняется после этих исправлений; её результаты
+фиксируются ниже только по завершении команд.
+
+Финальный после-review CI-equivalent прошёл: backend 61/61, frontend 65/65,
+shell 15/15; Compose browser 18/18 + 12/12 и отдельный Docker job — PASS.
+Просмотр финальных PNG выявил дополнительную layout-регрессию: после выделения
+scroll area flex-шапка могла сжаться до min-height и вынести строку профиля за
+нижнюю границу. Добавлен shrink-0 шапки и browser assertion геометрии её children.
+Финальные проверки повторяются после этого изменения; предыдущий PASS не подменяет
+результат повторной проверки.
+
+### Окончательные результаты после всех исправлений
+
+Все команды ниже завершились успешно на последней версии кода, включая исправление
+flex-шапки. Затем изменялась только итоговая документация. Использованы Node 24.21.0,
+pnpm 12.4.1 и PostgreSQL 17.6; воспроизведены обе jobs текущего ci.yml локально.
+
+| Проверка / команда                                                       | Фактический результат                                                     |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`                                         | PASS, lockfile не изменён                                                 |
+| `pnpm db:generate`, `pnpm db:validate`                                   | PASS                                                                      |
+| Migrations deploy/reapply, constraints и runtime grants                  | PASS в реальной PostgreSQL integration fixture и Compose startup          |
+| `pnpm lint`, `pnpm format:check`, `pnpm typecheck`                       | PASS                                                                      |
+| `pnpm test` — backend                                                    | 61 passed, 0 failed; новый budget suite 19, включая parent                |
+| `pnpm test` — frontend                                                   | 65 passed, 0 failed; 18 новых budget tests                                |
+| `pnpm build`                                                             | PASS, API и production web                                                |
+| `pnpm api:generate`, `pnpm api:check`                                    | PASS, OpenAPI/Orval воспроизводимы                                        |
+| `pnpm --filter @finora/web exec playwright install --with-deps chromium` | PASS                                                                      |
+| `pnpm test:e2e`                                                          | 15 passed, 0 failed, без retries                                          |
+| `pnpm test:e2e:auth`                                                     | 18 существующих + 12 budget scenarios passed, 0 failed, без retries       |
+| `pnpm test:docker`                                                       | PASS отдельного Docker job; тот же acceptance также прошёл с browser flag |
+| `git diff --check`                                                       | PASS                                                                      |
+
+Browser: 320×740, 390×844, 640×320, 768×1024, 1440×960, 1920×1080;
+проверены overflow, большие суммы/длинные названия, Sheet, 200% text, reduced motion,
+keyboard-only create/validation/confirmation/Escape/focus trap/restoration, текстовая
+и ARIA семантика прогресса. Axe: 0 нарушений в проверяемых WCAG-наборах. Финальные
+PNG просмотрены; геометрический regression test подтверждает границы шапки.
+
+Docker: чистый workspace без .env/node_modules, build, migrate deploy, seed ×3,
+healthy PostgreSQL/API/Nginx, auth, Stage 5 regression, budget CRUD, duplicate 409,
+два настоящих владельца и 404 чужих объектов, чужие операции не меняют spent,
+Decimal/date actual, сохранность edited/deleted state после API restart и seed.
+Проверены repeated startup, readiness 200 → 503 → 200 и liveness при DB outage.
+Baseline dataset SHA-256:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Runner удалил acceptance containers/volumes; отдельный тестовый PostgreSQL тоже
+удалён. Финальная проверка Docker не нашла finora containers/acceptance volumes;
+порт браузерного preview 4173 свободен. Логи и диагностические PNG находятся только
+в /private/tmp, не в изменениях репозитория.
+
+Финальные логи текущего запуска: `/private/tmp/finora-stage6-final-ci-2.log`,
+`/private/tmp/finora-stage6-final-docker-2.log`,
+`/private/tmp/finora-stage6-final-compose-browser-2.log`.
+
+Ограничения проверки: браузерные тесты выполнены в Chromium, без физического телефона
+и ручного screen-reader прогона. Production build сообщает предупреждение Vite
+о JS chunk >500 kB; предупреждение не отключалось, это не провал build. Remote CI
+Stage 6 не запускался, поскольку commit/push запрещены. Performance-замер не является
+нагрузочным SLA. Новых продуктовых ограничений сверх принятого scope не добавлено.
+
+Изменения по группам: backend BudgetsModule/DTO/validation/service и audit registration;
+OpenAPI/Orval; budget page/form/month picker/progress/sheet и необходимые shell fixes;
+реальные DB/component/Playwright/Compose regressions и acceptance runner; README,
+web README, ARCHITECTURE, ROADMAP, REPORT. Схема, migrations, seed, dependencies и
+lockfile не менялись. Финансовая арифметика остаётся Decimal/string; месяц операции
+остаётся DATE, текущий месяц выбирается в timezone профиля.
+
+Stage 6 завершён. Stage 7 и последующие этапы не начинались: Dashboard/Insights,
+scheduler, CSV, audit UI, dark mode и прочий последующий scope отложены. Commit,
+push и изменение Git history не выполнялись; HEAD остаётся `352d4cb`.
