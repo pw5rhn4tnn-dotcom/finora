@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
 import { expect, test, vi } from 'vitest';
+import type { CategoryDto } from '@finora/api-client';
 import { App } from '../../App';
 import { AuthProvider } from '../auth/AuthProvider';
 import { replaceSession, sessionKey } from '../auth/auth-context';
@@ -118,9 +119,45 @@ test('loading → пустой обзор: zero KPI, нет выдуманных
   expect(
     screen.getByText('Пока недостаточно оснований для наблюдений.'),
   ).toBeDefined();
-  expect(screen.getByText(/Здесь пока нет расписания/)).toBeDefined();
+  expect(screen.getByText(/Активных регулярных операций нет/)).toBeDefined();
   await userEvent.click(screen.getByText('Точные значения за шесть месяцев'));
   expect(screen.getAllByRole('row')).toHaveLength(7);
+});
+test('ближайшие регулярные операции: реальные данные вместо пустого состояния', async () => {
+  const category: CategoryDto = {
+    id: 'c1',
+    name: 'Аренда',
+    type: 'EXPENSE',
+    icon: 'house',
+    color: '#4F46E5',
+    archivedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  setup((u) =>
+    u.pathname.endsWith('/dashboard')
+      ? Response.json(
+          dashboardFixture(2026, 1, {
+            upcomingRecurring: [
+              {
+                id: 'r1',
+                category,
+                type: 'EXPENSE',
+                amount: '32000',
+                currency: 'RUB',
+                description: 'Аренда квартиры',
+                nextOccurrenceDate: '2026-02-08',
+              },
+            ],
+          }),
+        )
+      : undefined,
+  );
+  await rendered('Январь');
+  expect(screen.queryByText(/Активных регулярных операций нет/)).toBeNull();
+  expect(screen.getByText('Аренда')).toBeDefined();
+  expect(screen.getByText('08.02.2026')).toBeDefined();
+  expect(screen.getByText(/−32\s?000,00\s?RUB/)).toBeDefined();
 });
 test('доходы без расходов — partial state, точная сумма и savings', async () => {
   setup((u) =>

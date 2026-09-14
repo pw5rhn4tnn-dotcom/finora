@@ -454,7 +454,11 @@ await test('Stage 7: Dashboard HTTP / PostgreSQL / снимок / объём', a
           large.topCategories.map((c) => c.category.id),
           ids.slice(0, 5),
         );
-        assert.ok(queries.filter((q) => /^SELECT/i.test(q.trim())).length <= 5);
+        // Stage 8 добавляет постоянный bounded запрос ближайших recurring
+        // правил (LIMIT 5, не зависит от объёма истории). Как и budgets, он
+        // включает category через отдельный relation-запрос — итого +2:
+        // бюджет вырос 5 → 7.
+        assert.ok(queries.filter((q) => /^SELECT/i.test(q.trim())).length <= 7);
         const txQueries = queries.filter((q) => /FROM "transactions"/.test(q));
         assert.equal(txQueries.length, 2);
         assert.ok(txQueries.every((q) => /GROUP BY/i.test(q)));

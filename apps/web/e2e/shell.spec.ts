@@ -18,6 +18,9 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/transactions?*', (route) =>
     route.fulfill({ json: { items: [], page: 1, pageSize: 25, total: 0 } }),
   );
+  await page.route('**/api/v1/recurring-transactions?*', (route) =>
+    route.fulfill({ json: { items: [], page: 1, pageSize: 25, total: 0 } }),
+  );
   await page.route('**/api/v1/categories/options', (route) =>
     route.fulfill({ json: [] }),
   );

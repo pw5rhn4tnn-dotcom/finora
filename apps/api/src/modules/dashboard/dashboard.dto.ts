@@ -65,6 +65,25 @@ export class DashboardInsightDto {
   })
   description!: string;
 }
+export class DashboardUpcomingRecurringDto {
+  @ApiProperty({ description: 'Идентификатор правила', format: 'uuid' })
+  id!: string;
+  @ApiProperty({
+    description: 'Категория, включая архивную',
+    type: CategoryDto,
+  })
+  category!: CategoryDto;
+  @ApiProperty({ description: 'Тип операции', enum: ['INCOME', 'EXPENSE'] })
+  type!: 'INCOME' | 'EXPENSE';
+  @ApiProperty({ description: 'Сумма шаблона' }) amount!: string;
+  @ApiProperty({ description: 'Валюта шаблона' }) currency!: string;
+  @ApiProperty({ description: 'Описание' }) description!: string;
+  @ApiProperty({
+    description: 'Ближайшая дата occurrence',
+    format: 'date',
+  })
+  nextOccurrenceDate!: string;
+}
 export class DashboardDto extends DashboardMonthDto {
   @ApiProperty({
     description: 'Основная валюта владельца из того же снимка БД',
@@ -98,4 +117,10 @@ export class DashboardDto extends DashboardMonthDto {
     type: [DashboardInsightDto],
   })
   insights!: DashboardInsightDto[];
+  @ApiProperty({
+    description:
+      'До пяти ближайших активных recurring правил по возрастанию nextOccurrenceDate; не зависит от выбранного месяца',
+    type: [DashboardUpcomingRecurringDto],
+  })
+  upcomingRecurring!: DashboardUpcomingRecurringDto[];
 }

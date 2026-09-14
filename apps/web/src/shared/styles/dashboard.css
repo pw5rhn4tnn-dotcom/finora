@@ -94,6 +94,15 @@
   display: block;
   color: var(--color-text-secondary);
 }
+.dashboard-recurring__date {
+  color: var(--color-text-secondary);
+}
+.dashboard-recurring__amount--income {
+  color: var(--color-income);
+}
+.dashboard-recurring__amount--expense {
+  color: var(--color-expense);
+}
 .dashboard-insights {
   list-style: none;
   padding: 0;

@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stages 0–6 завершены и опубликованы; по сообщению пользователя последний remote GitHub Actions после двух CI repair-pass — GREEN. Stage 7 завершён, закоммичен (`1c683e1`) и опубликован; независимый acceptance-review подтвердил remote GitHub Actions на этом commit GREEN на GitHub-hosted Linux x86_64 (evidence — REPORT.md, раздел «Stage 7 — Remote CI / x86_64 Final Gate»). Stage 8–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stages 0–6 завершены и опубликованы; по сообщению пользователя последний remote GitHub Actions после двух CI repair-pass — GREEN. Stage 7 завершён, закоммичен (`1c683e1`) и опубликован; независимый acceptance-review подтвердил remote GitHub Actions на этом commit GREEN на GitHub-hosted Linux x86_64 (evidence — REPORT.md, раздел «Stage 7 — Remote CI / x86_64 Final Gate»). Stage 8 реализован и проверен локально (unit/integration/Docker/E2E) поверх HEAD `1c683e1`, но не закоммичен и не опубликован в этой сессии — commit/push выполняются только по отдельному разрешению пользователя; до commit и нового remote GitHub Actions run статус — LOCAL VALIDATION COMPLETE, не FINAL COMPLETE (детали — REPORT.md, раздел Stage 8). Stage 9–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -163,6 +163,8 @@ Docker clean/repeated startup, DB recovery и persistence после mutations �
 **Документация / REPORT:** правила Insights с реальными порогами, результаты сверки расчетов, состояние dashboard и явная зависимость recurring-блока от Stage 8.
 
 ## Stage 8 — Recurring Transactions
+
+**Статус:** реализован и проверен локально поверх подтверждённого Stage 7 HEAD (`1c683e1`): unit-календарь/timezone, HTTP CRUD/ownership/validation, scheduler catch-up/exhaustion/self-heal, concurrency (два независимых `PrismaClient` и четыре независимых OS-процесса на одно due правило), Docker acceptance (restart дважды на одну дату — occurrence создаётся один раз) — все PASS. Commit и push не выполнены в этой сессии; remote GitHub Actions на новом Stage 8 commit не запускался. Статус — LOCAL VALIDATION COMPLETE, не FINAL COMPLETE. Детали и найденные при self-review дефекты — REPORT.md.
 
 **Цель:** надежно создавать ежемесячные операции автоматически.
 

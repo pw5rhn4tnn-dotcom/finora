@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { financeAcceptance } from './finance-acceptance.mjs';
 import { dashboardAcceptance } from './dashboard-acceptance.mjs';
 import { budgetAcceptance } from './budget-acceptance.mjs';
+import {
+  recurringAcceptance,
+  recurringOutageAcceptance,
+} from './recurring-acceptance.mjs';
 import { securityCompose } from './security-compose.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -200,6 +204,8 @@ try {
   await financeAcceptance(financeUrl, compose, databaseHash);
   await budgetAcceptance(financeUrl, compose, databaseHash);
   await dashboardAcceptance(financeUrl, compose, databaseHash);
+  await recurringAcceptance(financeUrl, compose, databaseHash);
+  await recurringOutageAcceptance(financeUrl, compose, env);
   if (process.argv.includes('--browser')) {
     const resultsRoot = resolve('apps/web/test-results');
     await mkdir(resultsRoot, { recursive: true });

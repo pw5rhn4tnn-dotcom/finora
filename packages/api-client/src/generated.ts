@@ -564,6 +564,192 @@ export interface BudgetPatchDto {
   limitAmount?: string;
 }
 
+/**
+ * Тип операции
+ */
+export type RecurringDtoType = typeof RecurringDtoType[keyof typeof RecurringDtoType];
+
+
+export const RecurringDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Частота
+ */
+export type RecurringDtoFrequency = typeof RecurringDtoFrequency[keyof typeof RecurringDtoFrequency];
+
+
+export const RecurringDtoFrequency = {
+  MONTHLY: 'MONTHLY',
+} as const;
+
+export interface RecurringDto {
+  /** Идентификатор правила */
+  id: string;
+  /** Категория, включая архивную (после архивирования категории) */
+  category: CategoryDto;
+  /** Тип операции */
+  type: RecurringDtoType;
+  /**
+     * Сумма шаблона
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount: string;
+  /** Валюта шаблона */
+  currency: string;
+  /**
+     * Курс к основной валюте
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate: string;
+  /** Описание */
+  description: string;
+  /** Частота */
+  frequency: RecurringDtoFrequency;
+  /**
+     * День месяца; при коротком месяце используется последний день
+     * @minimum 1
+     * @maximum 31
+     */
+  dayOfMonth: number;
+  /** Дата первой occurrence */
+  startDate: string;
+  /**
+     * Последняя допустимая дата occurrence включительно
+     * @nullable
+     */
+  endDate: string | null;
+  /** Следующая (или последняя обработанная, если правило архивировано) дата occurrence */
+  nextOccurrenceDate: string;
+  /**
+     * Дата архивирования/деактивации
+     * @nullable
+     */
+  archivedAt: string | null;
+  /** Хотя бы одна операция уже сгенерирована — hard delete недоступен, доступно только архивирование */
+  hasGeneratedTransactions: boolean;
+  /** Создано */
+  createdAt: string;
+  /** Изменено */
+  updatedAt: string;
+}
+
+export interface RecurringPageDto {
+  /** Номер страницы */
+  page: number;
+  /** Размер страницы */
+  pageSize: number;
+  /** Всего собственных записей после фильтрации */
+  total: number;
+  /** Правила страницы */
+  items: RecurringDto[];
+}
+
+/**
+ * Тип операции
+ */
+export type RecurringInputDtoType = typeof RecurringInputDtoType[keyof typeof RecurringInputDtoType];
+
+
+export const RecurringInputDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export interface RecurringInputDto {
+  /**
+     * Положительная сумма шаблона десятичной строкой
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount: string;
+  /** Код валюты из /settings/options */
+  currency: string;
+  /**
+     * Курс к основной валюте; обязателен для чужой валюты. Для основной валюты равен 1
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate?: string;
+  /** Собственная активная категория соответствующего типа */
+  categoryId: string;
+  /** Тип операции */
+  type: RecurringInputDtoType;
+  /**
+     * Описание, переносится в каждую сгенерированную операцию
+     * @minLength 1
+     * @maxLength 500
+     */
+  description: string;
+  /** Дата первой occurrence; её календарный день фиксируется как dayOfMonth правила */
+  startDate: string;
+  /** Последняя допустимая дата occurrence включительно */
+  endDate?: string;
+}
+
+/**
+ * Тип операции
+ */
+export type RecurringPatchDtoType = typeof RecurringPatchDtoType[keyof typeof RecurringPatchDtoType];
+
+
+export const RecurringPatchDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export interface RecurringPatchDto {
+  /**
+     * Положительная сумма шаблона десятичной строкой
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount?: string;
+  /** Код валюты из /settings/options */
+  currency?: string;
+  /**
+     * Курс к основной валюте; обязателен для чужой валюты. Для основной валюты равен 1
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate?: string;
+  /** Собственная активная категория соответствующего типа */
+  categoryId?: string;
+  /** Тип операции */
+  type?: RecurringPatchDtoType;
+  /**
+     * Описание, переносится в каждую сгенерированную операцию
+     * @minLength 1
+     * @maxLength 500
+     */
+  description?: string;
+  /**
+     * День месяца 1–31; смена приводит к обязательному catch-up по прежнему расписанию перед применением
+     * @minimum 1
+     * @maximum 31
+     */
+  dayOfMonth?: number;
+  /**
+     * Последняя допустимая дата occurrence включительно; null снимает ограничение
+     * @nullable
+     */
+  endDate?: string | null;
+}
+
+/**
+ * Результат: удалено (ещё не создавало операций) либо архивировано (история сохранена)
+ */
+export type RecurringRemovalDtoOutcome = typeof RecurringRemovalDtoOutcome[keyof typeof RecurringRemovalDtoOutcome];
+
+
+export const RecurringRemovalDtoOutcome = {
+  deleted: 'deleted',
+  archived: 'archived',
+} as const;
+
+export interface RecurringRemovalDto {
+  /** Результат: удалено (ещё не создавало операций) либо архивировано (история сохранена) */
+  outcome: RecurringRemovalDtoOutcome;
+}
+
 export interface DashboardMonthDto {
   /** Доходы в основной валюте, точная десятичная строка */
   income: string;
@@ -618,6 +804,34 @@ export interface DashboardInsightDto {
   description: string;
 }
 
+/**
+ * Тип операции
+ */
+export type DashboardUpcomingRecurringDtoType = typeof DashboardUpcomingRecurringDtoType[keyof typeof DashboardUpcomingRecurringDtoType];
+
+
+export const DashboardUpcomingRecurringDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export interface DashboardUpcomingRecurringDto {
+  /** Идентификатор правила */
+  id: string;
+  /** Категория, включая архивную */
+  category: CategoryDto;
+  /** Тип операции */
+  type: DashboardUpcomingRecurringDtoType;
+  /** Сумма шаблона */
+  amount: string;
+  /** Валюта шаблона */
+  currency: string;
+  /** Описание */
+  description: string;
+  /** Ближайшая дата occurrence */
+  nextOccurrenceDate: string;
+}
+
 export interface DashboardDto {
   /** Доходы в основной валюте, точная десятичная строка */
   income: string;
@@ -648,6 +862,8 @@ export interface DashboardDto {
   budgets: BudgetDto[];
   /** До четырёх детерминированных наблюдений по приоритету; пусто при недостатке данных */
   insights: DashboardInsightDto[];
+  /** До пяти ближайших активных recurring правил по возрастанию nextOccurrenceDate; не зависит от выбранного месяца */
+  upcomingRecurring: DashboardUpcomingRecurringDto[];
 }
 
 export type CategoriesListParams = {
@@ -797,6 +1013,41 @@ export const BudgetsListPageSize = {
   NUMBER_10: 10,
   NUMBER_25: 25,
   NUMBER_50: 50,
+} as const;
+
+export type RecurringListParams = {
+/**
+ * Номер страницы от 1
+ * @minimum 1
+ * @maximum 9999999
+ */
+page?: number;
+/**
+ * Размер страницы
+ */
+pageSize?: RecurringListPageSize;
+/**
+ * Состояние правил
+ */
+state?: RecurringListState;
+};
+
+export type RecurringListPageSize = typeof RecurringListPageSize[keyof typeof RecurringListPageSize];
+
+
+export const RecurringListPageSize = {
+  NUMBER_10: 10,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
+} as const;
+
+export type RecurringListState = typeof RecurringListState[keyof typeof RecurringListState];
+
+
+export const RecurringListState = {
+  all: 'all',
+  active: 'active',
+  archived: 'archived',
 } as const;
 
 export type DashboardGetParams = {
@@ -3008,6 +3259,467 @@ export const budgetsDelete = async (id: string, options?: RequestInit): Promise<
 
   const data: budgetsDeleteResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as budgetsDeleteResponse
+}
+
+
+
+export type recurringListResponse200 = {
+  data: RecurringPageDto
+  status: 200
+}
+
+export type recurringListResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type recurringListResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type recurringListResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type recurringListResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type recurringListResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type recurringListResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type recurringListResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type recurringListResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type recurringListResponseSuccess = (recurringListResponse200) & {
+  headers: Headers;
+};
+export type recurringListResponseError = (recurringListResponse400 | recurringListResponse401 | recurringListResponse403 | recurringListResponse404 | recurringListResponse409 | recurringListResponse413 | recurringListResponse429 | recurringListResponse500) & {
+  headers: Headers;
+};
+
+export type recurringListResponse = (recurringListResponseSuccess | recurringListResponseError)
+
+export const getRecurringListUrl = (params?: RecurringListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/recurring-transactions?${stringifiedParams}` : `/api/v1/recurring-transactions`
+}
+
+/**
+ * @summary Список собственных правил с серверной пагинацией
+ */
+export const recurringList = async (params?: RecurringListParams, options?: RequestInit): Promise<recurringListResponse> => {
+
+  const res = await fetch(getRecurringListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recurringListResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as recurringListResponse
+}
+
+
+
+export type recurringCreateResponse201 = {
+  data: RecurringDto
+  status: 201
+}
+
+export type recurringCreateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type recurringCreateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type recurringCreateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type recurringCreateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type recurringCreateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type recurringCreateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type recurringCreateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type recurringCreateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type recurringCreateResponseSuccess = (recurringCreateResponse201) & {
+  headers: Headers;
+};
+export type recurringCreateResponseError = (recurringCreateResponse400 | recurringCreateResponse401 | recurringCreateResponse403 | recurringCreateResponse404 | recurringCreateResponse409 | recurringCreateResponse413 | recurringCreateResponse429 | recurringCreateResponse500) & {
+  headers: Headers;
+};
+
+export type recurringCreateResponse = (recurringCreateResponseSuccess | recurringCreateResponseError)
+
+export const getRecurringCreateUrl = () => {
+
+
+
+
+  return `/api/v1/recurring-transactions`
+}
+
+/**
+ * @summary Создать правило с атомарным аудитом; nextOccurrenceDate = startDate
+ */
+export const recurringCreate = async (recurringInputDto: RecurringInputDto, options?: RequestInit): Promise<recurringCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRecurringCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recurringInputDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recurringCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as recurringCreateResponse
+}
+
+
+
+export type recurringGetResponse200 = {
+  data: RecurringDto
+  status: 200
+}
+
+export type recurringGetResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type recurringGetResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type recurringGetResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type recurringGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type recurringGetResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type recurringGetResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type recurringGetResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type recurringGetResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type recurringGetResponseSuccess = (recurringGetResponse200) & {
+  headers: Headers;
+};
+export type recurringGetResponseError = (recurringGetResponse400 | recurringGetResponse401 | recurringGetResponse403 | recurringGetResponse404 | recurringGetResponse409 | recurringGetResponse413 | recurringGetResponse429 | recurringGetResponse500) & {
+  headers: Headers;
+};
+
+export type recurringGetResponse = (recurringGetResponseSuccess | recurringGetResponseError)
+
+export const getRecurringGetUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/recurring-transactions/${id}`
+}
+
+/**
+ * @summary Получить собственное правило
+ */
+export const recurringGet = async (id: string, options?: RequestInit): Promise<recurringGetResponse> => {
+
+  const res = await fetch(getRecurringGetUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recurringGetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as recurringGetResponse
+}
+
+
+
+export type recurringUpdateResponse200 = {
+  data: RecurringDto
+  status: 200
+}
+
+export type recurringUpdateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type recurringUpdateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type recurringUpdateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type recurringUpdateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type recurringUpdateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type recurringUpdateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type recurringUpdateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type recurringUpdateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type recurringUpdateResponseSuccess = (recurringUpdateResponse200) & {
+  headers: Headers;
+};
+export type recurringUpdateResponseError = (recurringUpdateResponse400 | recurringUpdateResponse401 | recurringUpdateResponse403 | recurringUpdateResponse404 | recurringUpdateResponse409 | recurringUpdateResponse413 | recurringUpdateResponse429 | recurringUpdateResponse500) & {
+  headers: Headers;
+};
+
+export type recurringUpdateResponse = (recurringUpdateResponseSuccess | recurringUpdateResponseError)
+
+export const getRecurringUpdateUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/recurring-transactions/${id}`
+}
+
+/**
+ * @summary Изменить активное правило; перед изменением расписания сервис завершает catch-up по прежним параметрам
+ */
+export const recurringUpdate = async (id: string,
+    recurringPatchDto: RecurringPatchDto, options?: RequestInit): Promise<recurringUpdateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRecurringUpdateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recurringPatchDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recurringUpdateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as recurringUpdateResponse
+}
+
+
+
+export type recurringDeleteResponse200 = {
+  data: RecurringRemovalDto
+  status: 200
+}
+
+export type recurringDeleteResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type recurringDeleteResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type recurringDeleteResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type recurringDeleteResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type recurringDeleteResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type recurringDeleteResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type recurringDeleteResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type recurringDeleteResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type recurringDeleteResponseSuccess = (recurringDeleteResponse200) & {
+  headers: Headers;
+};
+export type recurringDeleteResponseError = (recurringDeleteResponse400 | recurringDeleteResponse401 | recurringDeleteResponse403 | recurringDeleteResponse404 | recurringDeleteResponse409 | recurringDeleteResponse413 | recurringDeleteResponse429 | recurringDeleteResponse500) & {
+  headers: Headers;
+};
+
+export type recurringDeleteResponse = (recurringDeleteResponseSuccess | recurringDeleteResponseError)
+
+export const getRecurringDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/recurring-transactions/${id}`
+}
+
+/**
+ * @summary Удалить правило, ещё не создававшее операций, либо архивировать с сохранением истории
+ */
+export const recurringDelete = async (id: string, options?: RequestInit): Promise<recurringDeleteResponse> => {
+
+  const res = await fetch(getRecurringDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: recurringDeleteResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as recurringDeleteResponse
 }
 
 

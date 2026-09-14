@@ -2850,6 +2850,625 @@
         ]
       }
     },
+    "/api/v1/recurring-transactions": {
+      "get": {
+        "operationId": "recurringList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Номер страницы от 1",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9999999,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Размер страницы",
+            "schema": {
+              "default": 25,
+              "type": "number",
+              "enum": [
+                10,
+                25,
+                50
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "Состояние правил",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "archived"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Список собственных правил с серверной пагинацией",
+        "tags": [
+          "Регулярные операции"
+        ]
+      },
+      "post": {
+        "operationId": "recurringCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Создать правило с атомарным аудитом; nextOccurrenceDate = startDate",
+        "tags": [
+          "Регулярные операции"
+        ]
+      }
+    },
+    "/api/v1/recurring-transactions/{id}": {
+      "get": {
+        "operationId": "recurringGet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Получить собственное правило",
+        "tags": [
+          "Регулярные операции"
+        ]
+      },
+      "patch": {
+        "operationId": "recurringUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringPatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Изменить активное правило; перед изменением расписания сервис завершает catch-up по прежним параметрам",
+        "tags": [
+          "Регулярные операции"
+        ]
+      },
+      "delete": {
+        "operationId": "recurringDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringRemovalDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Удалить правило, ещё не создававшее операций, либо архивировать с сохранением истории",
+        "tags": [
+          "Регулярные операции"
+        ]
+      }
+    },
     "/api/v1/dashboard": {
       "get": {
         "description": "Обязательны year и month без ведущих нулей. Неизвестные и повторные query-поля запрещены. Полное шестимесячное окно: выбранный месяц от 0001-06 до 9999-12. DATE сравнивается без сдвига timezone. Сравнения insights относятся ко всему предыдущему календарному месяцу, а не к одинаковому числу дней.",
@@ -3847,6 +4466,270 @@
         },
         "additionalProperties": false
       },
+      "RecurringDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Идентификатор правила",
+            "format": "uuid"
+          },
+          "category": {
+            "description": "Категория, включая архивную (после архивирования категории)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип операции",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Сумма шаблона",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Валюта шаблона"
+          },
+          "exchangeRate": {
+            "type": "string",
+            "description": "Курс к основной валюте",
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,12})?$"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание"
+          },
+          "frequency": {
+            "type": "string",
+            "description": "Частота",
+            "enum": [
+              "MONTHLY"
+            ]
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "description": "День месяца; при коротком месяце используется последний день",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Дата первой occurrence",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Последняя допустимая дата occurrence включительно",
+            "format": "date",
+            "nullable": true
+          },
+          "nextOccurrenceDate": {
+            "type": "string",
+            "description": "Следующая (или последняя обработанная, если правило архивировано) дата occurrence",
+            "format": "date"
+          },
+          "archivedAt": {
+            "type": "string",
+            "description": "Дата архивирования/деактивации",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasGeneratedTransactions": {
+            "type": "boolean",
+            "description": "Хотя бы одна операция уже сгенерирована — hard delete недоступен, доступно только архивирование"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Создано",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Изменено",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "type",
+          "amount",
+          "currency",
+          "exchangeRate",
+          "description",
+          "frequency",
+          "dayOfMonth",
+          "startDate",
+          "endDate",
+          "nextOccurrenceDate",
+          "archivedAt",
+          "hasGeneratedTransactions",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "RecurringPageDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Номер страницы"
+          },
+          "pageSize": {
+            "type": "number",
+            "description": "Размер страницы"
+          },
+          "total": {
+            "type": "number",
+            "description": "Всего собственных записей после фильтрации"
+          },
+          "items": {
+            "description": "Правила страницы",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecurringDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
+      "RecurringInputDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "description": "Положительная сумма шаблона десятичной строкой",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Код валюты из /settings/options"
+          },
+          "exchangeRate": {
+            "type": "string",
+            "description": "Курс к основной валюте; обязателен для чужой валюты. Для основной валюты равен 1",
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,12})?$"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Собственная активная категория соответствующего типа",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип операции",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание, переносится в каждую сгенерированную операцию",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Дата первой occurrence; её календарный день фиксируется как dayOfMonth правила",
+            "format": "date",
+            "example": "2026-10-05"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Последняя допустимая дата occurrence включительно",
+            "format": "date"
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "categoryId",
+          "type",
+          "description",
+          "startDate"
+        ]
+      },
+      "RecurringPatchDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "description": "Положительная сумма шаблона десятичной строкой",
+            "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Код валюты из /settings/options"
+          },
+          "exchangeRate": {
+            "type": "string",
+            "description": "Курс к основной валюте; обязателен для чужой валюты. Для основной валюты равен 1",
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,12})?$"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "Собственная активная категория соответствующего типа",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип операции",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание, переносится в каждую сгенерированную операцию",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "dayOfMonth": {
+            "type": "integer",
+            "description": "День месяца 1–31; смена приводит к обязательному catch-up по прежнему расписанию перед применением",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Последняя допустимая дата occurrence включительно; null снимает ограничение",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "RecurringRemovalDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "description": "Результат: удалено (ещё не создавало операций) либо архивировано (история сохранена)",
+            "enum": [
+              "deleted",
+              "archived"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
       "DashboardMonthDto": {
         "type": "object",
         "properties": {
@@ -3947,6 +4830,58 @@
           "description"
         ]
       },
+      "DashboardUpcomingRecurringDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Идентификатор правила",
+            "format": "uuid"
+          },
+          "category": {
+            "description": "Категория, включая архивную",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CategoryDto"
+              }
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип операции",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Сумма шаблона"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Валюта шаблона"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание"
+          },
+          "nextOccurrenceDate": {
+            "type": "string",
+            "description": "Ближайшая дата occurrence",
+            "format": "date"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "type",
+          "amount",
+          "currency",
+          "description",
+          "nextOccurrenceDate"
+        ]
+      },
       "DashboardDto": {
         "type": "object",
         "properties": {
@@ -4017,6 +4952,13 @@
             "items": {
               "$ref": "#/components/schemas/DashboardInsightDto"
             }
+          },
+          "upcomingRecurring": {
+            "description": "До пяти ближайших активных recurring правил по возрастанию nextOccurrenceDate; не зависит от выбранного месяца",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardUpcomingRecurringDto"
+            }
           }
         },
         "required": [
@@ -4032,7 +4974,8 @@
           "distribution",
           "topCategories",
           "budgets",
-          "insights"
+          "insights",
+          "upcomingRecurring"
         ]
       }
     }

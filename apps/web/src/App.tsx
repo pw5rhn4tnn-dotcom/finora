@@ -3,6 +3,7 @@ import { AuthPage } from './pages/AuthPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { BudgetsPage } from './pages/BudgetsPage';
+import { RecurringPage } from './pages/RecurringPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router';
@@ -29,6 +30,7 @@ export function App() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/budgets" element={<BudgetsPage />} />
+          <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route index element={<OverviewPage />} />
           {navigation
@@ -40,6 +42,7 @@ export function App() {
                   '/transactions',
                   '/categories',
                   '/budgets',
+                  '/recurring',
                 ].includes(item.to),
             )
             .map((item) => (

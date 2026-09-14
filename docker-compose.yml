@@ -31,6 +31,7 @@ services:
       DATABASE_URL: postgresql://finora_runtime:finora_local_runtime@postgres:5432/finora
       MIGRATION_DATABASE_URL: postgresql://finora_migrator:finora_local_migrator@postgres:5432/finora
       SEED_ANCHOR_DATE: ${SEED_ANCHOR_DATE:-}
+      RECURRING_SCHEDULER_DISABLED: ${RECURRING_SCHEDULER_DISABLED:-}
     depends_on:
       postgres:
         condition: service_healthy

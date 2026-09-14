@@ -21,6 +21,7 @@ export function dashboardFixture(
     topCategories: [],
     budgets: [],
     insights: [],
+    upcomingRecurring: [],
     trend: Array.from({ length: 6 }, (_, i) => {
       const index = year * 12 + month - 6 + i;
       return {

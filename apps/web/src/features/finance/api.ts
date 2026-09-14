@@ -4,8 +4,10 @@ import {
   categoriesList,
   categoriesOptions,
   transactionsList,
+  recurringList,
   type CategoriesListParams,
   type TransactionsListParams,
+  type RecurringListParams,
   type UserDto,
 } from '@finora/api-client';
 import { useAuth, sessionKey, replaceSession } from '../auth/auth-context';
@@ -70,6 +72,19 @@ export function useTransactions(params: TransactionsListParams) {
     queryFn: ({ signal }) =>
       guard(async () => {
         const r = await transactionsList(params, { signal });
+        if (r.status === 200) return r.data;
+        throw new ApiError(r.status, r.data);
+      }),
+    retry: false,
+  });
+}
+export function useRecurring(params: RecurringListParams) {
+  const { user, guard } = useFinanceSession();
+  return useQuery({
+    queryKey: ['finance', user?.id, 'recurring', params],
+    queryFn: ({ signal }) =>
+      guard(async () => {
+        const r = await recurringList(params, { signal });
         if (r.status === 200) return r.data;
         throw new ApiError(r.status, r.data);
       }),

@@ -61,7 +61,7 @@ Application code, `apps/web`, `apps/api`, package/workspace config, dependencies
 
 Stage 0 завершен в пределах документации. Предлагаемый commit: `docs: зафиксировать архитектуру и план разработки Finora`. Commit не выполнен. Следующий этап — Stage 1 — Foundation; он не начат.
 
-## 13.09.2026 — Stage 1: Foundation
+## 13.09.2026 — Stage 1: фундамент monorepo
 
 ### Preflight и границы
 
@@ -281,7 +281,7 @@ Stage 2 не начат: БД, Docker runtime, health и реальный Swagge
 остаются его запланированной областью, а не недоделками Foundation.
 Предлагаемый commit: `chore(foundation): создать monorepo и проверяемую основу Finora`.
 
-## 13.09.2026 — Stage 2: Database & Docker Foundation
+## 13.09.2026 — Stage 2: база данных и Docker-инфраструктура
 
 ### Preflight и реализация
 
@@ -449,7 +449,7 @@ volumes удалены; dev/start процессы завершены, docker ps
 
 Предлагаемый commit: `feat(database): добавить PostgreSQL, Prisma и Docker-инфраструктуру`.
 
-## 14.09.2026 — Stage 3: Design System & App Shell
+## 14.09.2026 — Stage 3: дизайн-система и оболочка приложения
 
 ### Preflight и решения до реализации
 
@@ -705,7 +705,7 @@ PROJECT.md, DISCOVERY.md и AI_RULES.md не изменены. Remote GitHub Act
 
 Предлагаемый commit: `fix(ci): исправить восстановление PostgreSQL в acceptance`.
 
-## 2026-09-14 — Stage 4: Authentication & User Isolation
+## 14.09.2026 — Stage 4: аутентификация и изоляция пользователей
 
 Использован Codex desktop, shell и Browser skill для визуальной проверки.
 Субагенты не использовались. Задача выполнена в исходном рабочем дереве `main`,
@@ -886,7 +886,7 @@ Commit/push, force и history rewrite не выполнялись.
 
 Предлагаемый commit: feat(auth): добавить авторизацию и изоляцию пользователей Finora
 
-## 2026-09-14 — Stage 5: Categories & Transactions Core
+## 14.09.2026 — Stage 5: категории и операции
 
 Работа выполняется Codex desktop в исходном рабочем дереве, без subagents,
 commit/push и изменения Git history. Исходное дерево было чистым. Источники
@@ -1069,7 +1069,7 @@ ARCHITECTURE, ROADMAP, web README, REPORT и название CI шага.
 Stage 5 завершён. Stage 6 не начинался. Commit/push и изменение Git history
 не выполнялись. Remote CI для этой незакоммиченной версии не запускался.
 
-## Stage 6 — Budgets
+## 14.09.2026 — Stage 6: бюджеты
 
 Задание: выполнить только Stage 6, без commit/push и изменения history; законченный
 budget workflow, реальная PostgreSQL/Compose, browser acceptance, self-review и
@@ -1568,7 +1568,7 @@ production/test коде. Между проходами создавались �
 `final-browser-acceptance.log`; matrix — `/private/tmp/finora-ci-matrix/`,
 Linux Stage 6 — `/private/tmp/finora-ci-stage6/result.log`.
 
-## Stage 7 — Dashboard & Insights, 2026-09-14
+## 14.09.2026 — Stage 7: dashboard и аналитика
 
 Исходная точка: `680e6a5a9b484344b5d9e8d89c33c1cd5084bf48`, чистый working tree.
 Пользователь сообщил, что Stages 0–6 опубликованы и последний GitHub Actions
@@ -1909,3 +1909,311 @@ remount отменяет первую медленную загрузку»). С
 
 **Итоговый статус remote-CI/x86_64 gate: PASS.** Ложноположительных зелёных
 результатов не обнаружено.
+
+## 15.09.2026 — Stage 8: повторяющиеся операции
+
+Исходная точка: `1c683e1` (Stage 7, подтверждён remote CI GREEN на Linux x86_64
+выше), чистый working tree. До реализации полностью прочитаны PROJECT, DISCOVERY,
+AI_RULES, ARCHITECTURE (включая уже написанный до кода §14 «Планировщик регулярных
+операций» — Stage 0 architecture-first), ROADMAP Stage 8, README, REPORT (история
+Stage 0–7), Prisma schema/migrations, весь transactions/budgets/categories/audit
+pipeline, seed. Ключевая находка: схема, DB constraints (`UNIQUE(recurringTransactionId,
+recurringOccurrenceDate)`, `recurring_day_range`, `recurring_date_range`,
+`transactions_recurring_pair/source`, partial index `recurring_active_next_occurrence_idx`),
+runtime grants, `recurringSnapshot()`, категорийный cascade-архив recurring правил
+(`CategoriesService.remove`) и seed (6 dormant правил, включая корректную симуляцию
+month-end advance) уже были реализованы в Stage 0–7 заранее — Stage 8 добавлял
+CRUD/scheduler/frontend поверх готового фундамента, не переписывая его. Commit/push
+не выполнялись; правило задания — не заявлять `Stage 8 COMPLETE` без нового remote run.
+
+### Реализованный ROADMAP scope
+
+`RecurringTransactionsModule`: `RecurringController`/`RecurringService` (CRUD,
+ownership через `lockOwner` + составные FK, та же validation/audit конвенция, что
+Stage 5/6), `SchedulerService` (in-process interval, без очереди/worker), общий
+`engine.ts` (`processOneOccurrence`/`catchUpRule`/`runSchedulerTick`), чистые
+`calendar.ts` (month-end clamp, IANA `timeZone` → calendar date) и тестируемый
+`Clock`. Dashboard получил `upcomingRecurring` (до пяти активных правил, bounded
+LIMIT, тот же snapshot-transaction) и реальный UI-блок вместо честного пустого
+состояния. Frontend: `/recurring` — список с фильтром состояния, форма
+create/edit, delete-или-архив с корректной формулировкой. Seed не менялся —
+уже содержал зарплату/аренду/подписки на трёх пользователей с сформированной
+шестимесячной историей. Другие частоты, очереди, отдельный worker, CSV, audit UI
+— вне scope, не начаты.
+
+### Recurrence semantics и явные policy-решения
+
+DISCOVERY/ARCHITECTURE не разводят `startDate` и `dayOfMonth` как независимые
+поля формы — минимальная непротиворечивая политика: `dayOfMonth` выводится из
+календарного дня `startDate`, отдельного поля в форме создания нет;
+`nextOccurrenceDate` при создании равен `startDate`. `dayOfMonth` и `endDate`
+редактируемы через `PATCH`, `startDate` неизменяем (происхождение правила).
+Pause/resume как отдельная концепция нигде в DISCOVERY/ARCHITECTURE/коде не
+определены и не существуют для категорий (тот же архив — необратимое действие
+без unarchive API) — по аналогии выбрана та же политика для recurring: активно
+⟷ архивировано, без промежуточного «пауза», без resume. Достижение `endDate`
+(следующая occurrence строго после него) автоматически архивирует правило —
+`nextOccurrenceDate` не может быть NULL по схеме, поэтому «больше не исполняется»
+выражается тем же `archivedAt`, что и любая другая деактивация, с audit `ARCHIVE`
+вместо `UPDATE`. Все policy-решения обратимо задокументированы здесь и покрыты
+тестами, ничего не скрыто в коде без объяснения.
+
+### Scheduler architecture и idempotency
+
+Триггер — `setInterval` (по умолчанию 60 c, `RECURRING_SCHEDULER_INTERVAL_MS`,
+`RECURRING_SCHEDULER_DISABLED=true` для отключения) плюс один проход в
+`onModuleInit`: restart контейнера сразу подтягивает долг, не дожидаясь
+интервала. Таймер — намеренно только doptimisation-триггер, не граница
+корректности (мега-scope этого этапа явно требовал не полагаться на in-memory
+lock/mutex как единственную защиту): реальную защиту от дублей несёт
+исключительно PostgreSQL. `@nestjs/schedule` не добавлялся — обычный
+`setInterval`/`onModuleInit` полностью закрывает требование «Nest scheduler
+внутри API» без новой dependency.
+
+Каждая occurrence — одна короткая DB transaction: `lockOwner` (тот же
+`SELECT ... FOR UPDATE FROM users`, что уже используют все финансовые мутации
+с Stage 5/6 — это и есть общая точка сериализации per-user) → `SELECT ... FOR
+UPDATE` на саму строку `recurring_transactions` (защита от гонки с `PATCH`
+конкретного правила) → повторная проверка `archivedAt`/даты в IANA `timeZone`
+владельца → (если occurrence ещё не зафиксирована в audit) `Transaction
+{source: RECURRING}` + audit `CREATE`, переиспользуя тот же `financialSnapshot`,
+что ручные операции — отдельного «облегчённого» денежного пути нет → advance
+`nextOccurrenceDate` + audit `UPDATE`/`ARCHIVE`. `UNIQUE(recurringTransactionId,
+recurringOccurrenceDate)` — финальная защита БД, отдельно перехватывается
+`P2002` на случай обхода блокировки. Формулировка из задания использована
+буквально: exactly-once EFFECT достигается idempotent processing + database
+uniqueness + transaction boundaries, «exactly-once delivery» не заявляется.
+
+### Catch-up, month-end, timezone/DST
+
+Долг одного правила обрабатывается ограниченными пачками (`MAX_OCCURRENCES_PER_PASS
+= 60`, ~5 лет ежемесячного долга за проход) — явная операционная граница,
+задокументированная как таковая, не выдаваемая за SLA; остаток продолжает
+следующий тик без потерь (regression-тест: искусственный долг с 2010 года,
+первый проход обрабатывает ровно 60, второй продолжает). Месяц всегда считается
+заново от исходного `dayOfMonth` (`clampCalendarDate`), никогда от уже
+укороченной даты — тест доказывает 31 января → 28 февраля (не високосный) →
+снова 31 марта, и отдельно 31 января → 29 февраля 2028 (високосный) → 31 марта.
+`calendarDateInZone` — `Intl.DateTimeFormat` с `timeZone` владельца, не
+timezone контейнера; тест сравнивает один и тот же UTC-момент в UTC/Tokyo/
+New_York/Berlin, включая случай, когда локальная дата в Нью-Йорке на день
+позади UTC. DST: recurrence — чистая календарная DATE без wall-clock компонента
+(в отличие от, например, ежедневного напоминания на конкретное время), поэтому
+классический spring-forward/fall-back риск «несуществующего» или «двойного»
+момента времени к ней неприменим по конструкции — это явно проверено тестом
+(один и тот же переход Europe/Berlin 2027-03-28 не создаёт и не пропускает
+календарную дату), а не голословно заявлено.
+
+### Crash consistency
+
+Все шаги одной occurrence (создание Transaction, audit CREATE, advance
+nextOccurrenceDate, audit UPDATE/ARCHIVE) выполняются в одной Postgres DB
+transaction — атомарность коммита/отката является гарантией самой БД, а не
+дополнительным кодом Finora, и Stage 5–7 уже полагались на этот же примитив
+для finance/budgets/dashboard мутаций.
+
+**Update (пост-приёмочный review):** предыдущая версия этого раздела
+останавливалась на аргументе «гарантию даёт сама СУБД» без целевого теста.
+По итогам review добавлен детерминированный failure-injection тест
+(`apps/api/test/recurring.test.ts`, `Stage 8: crash consistency`) — без
+test-only hook в production-коде: тестовый `PrismaClient.$extends({ query:
+{ $allModels: { $allOperations(...) } } })` (тот же приём, что уже
+использовался в `dashboard.test.ts` для «Один snapshot») перехватывает
+`Transaction.create` внутри `processOneOccurrence`'s `$transaction`, а сразу
+после ннего бросает ошибку на следующем `RecurringTransaction.update` —
+то есть между двумя записями, которые обязаны коммититься вместе. Проверено:
+после сбоя ни Transaction, ни audit UPDATE/ARCHIVE указателя не сохраняются
+(rollback), `nextOccurrenceDate` не продвинут; последующий чистый
+`runSchedulerTick` создаёт ровно одну Transaction, повтор — не дублирует.
+(Наивная реализация того же теста через `query: { <model>: { <op>(...) } }`
+per-model хуки — НЕ через `$allOperations` — молча не участвует в откате
+интерактивной `$transaction` при использовании `@prisma/adapter-pg` в Prisma
+7.10: перехваченный INSERT переживает rollback. Это ограничение самого
+Prisma extensions API у этой версии/адаптера, а не баг engine.ts; изолированно
+воспроизведено и подтверждено, что `$allOperations` работает корректно.)
+
+Отдельно, на уровне Docker, crash/restart уже проверялся по-настоящему:
+`recurring-acceptance.mjs` создаёт правило, `restart api` (реальный
+SIGTERM/перезапуск процесса) генерирует occurrence, второй `restart api` на
+ту же дату не создаёт дубль — реальный процесс убит и перезапущен между
+обработкой occurrences, а не симулирован. Это доказывает устойчивость к
+restart между occurrences, но не к сбою ПОСЕРЕДИНЕ одной DB transaction —
+именно этот пробел закрывает unit-тест с fault injection выше.
+
+### Concurrency/race review
+
+Разобраны все сценарии из чек-листа: **scheduler vs scheduler** — DB-level
+(row lock + unique constraint), regression: два независимых `PrismaClient` и
+четыре независимых OS-процесса (`recurring-scheduler-worker.ts`, реальный
+`child_process`, без общего JS-состояния) на одно due правило → ровно один
+`Transaction`. **Несколько due правил/пользователей за один tick** — отдельный
+regression (`runSchedulerTick`, три due правила: два у одного владельца, одно
+у другого) подтверждает, что кандидаты обрабатываются все в одном проходе и
+изолированно (ни одна occurrence не попадает не тому владельцу) — до этого
+явно тестировался только путь с одним due правилом за раз. **scheduler vs
+edit** — тот же порядок блокировок (user → rule) в `engine.ts` и в
+`RecurringService.update()`; изначально это подтверждалось только
+последовательным тестом на смену `dayOfMonth` (catch-up по старым параметрам
+ПЕРЕД применением нового расписания) — business-logic ordering, а не гонка.
+По итогам review добавлен настоящий concurrency regression:
+`Promise.allSettled([runSchedulerTick(...), recurring.update(...)])` на ещё не
+сгенерированной occurrence — ровно одна Transaction и корректный patch
+независимо от того, чей catch-up выиграл гонку. **scheduler vs delete** — оба
+пути сначала
+берут `FOR UPDATE` на строку `users` того же владельца (`lockOwner`) — это и
+есть общая точка сериализации; добавлен отдельный regression-тест
+(`Promise.allSettled` scheduler tick + `RecurringService.remove()` на ещё не
+сгенерированном правиле), доказывающий инвариант «правило с фактом генерации
+не удаляется физически» в обе стороны исхода гонки. **scheduler vs
+pause/resume** — не применимо (концепция отсутствует, см. policy-решения).
+**scheduler vs category archive** — cascade уже атомарен (Stage 5/7), плюс
+defensive self-heal в `engine.ts` на случай прямой рассинхронизации, покрыт
+тестом. **scheduler vs user timezone update** — тот же per-user lock,
+владелец перечитывается заново внутри транзакции. **scheduler vs database
+restart** — Docker acceptance выше. **scheduler vs Dashboard GET** — не новый
+риск: dashboard уже читает через `RepeatableRead` transaction (Stage 7),
+recurring-generated `Transaction` — обычная строка той же таблицы, никакого
+отдельного кэша Stage 8 не вводит. **catch-up vs normal tick** — буквально
+одна и та же функция (`catchUpRule`), разойтись негде.
+
+### Stress
+
+`apps/api/test/recurring.test.ts` прогнан 20 последовательных чистых раз
+(`node --test dist-test/test/recurring.test.js`, `--test-concurrency=1`),
+0 fail, 0 retries, включая оба concurrency-теста (2 воркера в процессе, 4
+независимых OS-процесса) и race scheduler/DELETE. Один прогон в середине
+серии ошибочно закончился 2 pass/3 fail из-за отсутствия `MIGRATION_DATABASE_URL`
+в конкретном вызове shell (не продуктовый дефект — воспроизведено и объяснено
+именно этой причиной, серия повторена целиком с переменной окружения и дала
+20/20 pass). Не скрываю эту ложную тревогу, поскольку FAILURE POLICY требует
+не переписывать историю падений: причина установлена, это artefact тестового
+окружения, а не recurring engine.
+
+### Database/query review
+
+Индекс `recurring_active_next_occurrence_idx` (`nextOccurrenceDate` WHERE
+`archivedAt IS NULL`) уже существовал с Stage 0 миграции и используется due-
+выборкой `runSchedulerTick`; новых индексов Stage 8 не потребовалось —
+добавление было бы «на всякий случай» без нового запроса, которому это нужно.
+`runSchedulerTick` не грузит все правила в память: фильтр `nextOccurrenceDate
+<= UTC-сегодня + 1 день` (грубый, покрывающий любой IANA offset −12…+14, точная
+проверка — внутри транзакции per-правило) ограничивает кандидатов, а не
+использует весь `recurring_transactions`. Dashboard: `upcomingRecurring` —
+шестой источник данных агрегата, `include: { category: true }` (тот же
+relation-паттерн, что `budgets`) добавляет не один, а два физических SELECT
+(основной + relation), поэтому существующий Stage 7 тест «не более 5 SELECT
+на 10 000 операций» пересчитан и обновлён на 7 с объяснением в самом тесте и
+в коде `dashboard.service.ts` — это не ослабление проверки, а честная
+корректировка фиксированного (не растущего с объёмом) бюджета после
+намеренного добавления одного bounded LIMIT-запроса.
+
+### Docker acceptance
+
+`pnpm test:docker` (чистый checkout без node_modules/.env, `docker compose up`
+без `--build`, отдельный disposable project) — PASS, включая новый
+`recurringAcceptance`: create → `restart api` (генерирует occurrence на
+реальные системные часы контейнера, `startDate` = сегодня в `Europe/Moscow`
+seed-профиля) → ровно одна `Transaction` → второй `restart api` на ту же дату
+→ дубля нет → ownership (чужой владелец получает 404 на GET/PATCH/DELETE) →
+`DELETE` после генерации архивирует, не удаляет → повторный seed не меняет
+hash БД → финальный restart сохраняет и hash, и единственность сгенерированной
+операции. Stage 5/Stage 6/Dashboard acceptance того же прогона — без
+регрессий (PASS).
+
+**Update (пост-приёмочный review):** до этого момента generic outage-тест
+(останавливает/поднимает `postgres`) и `recurringAcceptance` (создаёт due
+правило) были двумя непересекающимися сценариями — ни один не проверял due
+occurrence именно в момент недоступности PostgreSQL. Добавлен
+`recurringOutageAcceptance` (`scripts/recurring-acceptance.mjs`, вызывается
+после `recurringAcceptance` в `test-docker.mjs`): due-правило создаётся, затем
+`postgres` останавливается (scheduler на это время принудительно отключён —
+`RECURRING_SCHEDULER_DISABLED=true`, пересоздание api только пока PostgreSQL
+ещё/уже здорова, — иначе `start-container.sh` внутри контейнера синхронно
+ждёт БД и мигрирует ДО запуска `main.js`, поэтому `restart api` прямо во время
+outage не поднимает процесс вообще — проверено эмпирически отдельным
+disposable compose stack). После восстановления PostgreSQL прямым SQL
+(`docker compose exec postgres psql`, не через ещё не готовый API)
+подтверждается: 0 сгенерированных `Transaction`, `nextOccurrenceDate` не
+продвинут, нет audit UPDATE/ARCHIVE по правилу — то есть никакого partial
+state за время outage. Затем scheduler включается обратно (`restart api`
+форсирует немедленный tick) — ровно одна `Transaction`, повторный restart не
+создаёт дубль. Проверено PASS на отдельном disposable compose stack (не в
+рамках полного `pnpm test:docker`, чтобы не повторять весь Stage 8 gate) —
+сценарий воспроизведён и вручную, и в связке сразу после `recurringAcceptance`
+на одном стеке.
+
+### Portability
+
+macOS arm64 (host, вся разработка и `pnpm test`) — PASS. Linux (некорневой
+пользователь `node`, официальный образ `node:24-bookworm`, тот же
+Stage 8 test suite: install → typecheck → lint → format:check → 93/93 test,
+подключение к тому же PostgreSQL через Docker network вместо host localhost)
+— PASS; это реальный некорневой Linux-процесс с case-sensitive файловой
+системой, а не предположение. Уточнение: доступный Docker на этой машине даёт
+только `linux/arm64` контейнеры (Apple Silicon) — то есть это Linux, но не
+x86_64; настоящий Linux x86_64 gate — только подтверждённый GitHub Actions
+remote run (см. запись Stage 7 выше про метод проверки архитектуры рантайма),
+который требует commit/push нового Stage 8 коммита. Commit/push не выполнялись
+в этой сессии по прямому ограничению задания («commit/push только по
+отдельному разрешению пользователя»), поэтому remote x86_64 gate для Stage 8
+физически не мог быть пройден в этой сессии — это не пропущенная проверка, а
+следствие явного ограничения, которое соблюдается намеренно.
+
+### Self-review: найденные дефекты и исправления
+
+Проведено два прохода (product/spec и engineering/concurrency/security).
+Найдено и исправлено до финальной приёмки: (1) `financialSnapshot` вызывался
+в generated-transaction пути без поля `currency` в `data` — типовая ошибка,
+пойманная `tsc`, а не рантаймом; (2) Stage 7 тест «не более 5 SELECT» не
+учитывал новый bounded-запрос — пересчитан и задокументирован, см. Database/
+query review; (3) `RecurringPatchDto.endDate` в OpenAPI не был помечен
+`nullable`, хотя zod-валидация принимала `null` для снятия ограничения —
+реальное расхождение контракта, исправлено и подтверждено `pnpm api:check`
+(воспроизводимость сохранена); (4) фронтенд-тест дашборда использовал object
+literal без явного типа `CategoryDto`, из-за чего `icon` терял литеральный
+тип — типизация исправлена явной аннотацией; (5) `userEvent.type` в поле
+`type="date"` не работает предсказуемо в jsdom — заменено на `fireEvent.change`
+во всех местах; (6) `getByRole('button', ...)` не находит `disabled` кнопки
+(корректно исключены из accessibility tree) — тест архивного правила
+переписан на текстовый запрос в рамках конкретной карточки. Никаких known-but-
+undisclosed дефектов не осталось; список выше — все найденные проблемы, ни
+одна не была замаскирована retry/skip/ослаблением assertion без объяснения.
+
+### Тесты — итоговая таблица
+
+| Область                                                                                                                                                                                          | Результат                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Backend unit (calendar/timezone, чистые функции)                                                                                                                                                 | PASS                                                                   |
+| Backend integration (recurring CRUD/ownership/validation, PostgreSQL)                                                                                                                            | PASS                                                                   |
+| Scheduler (catch-up, exhaustion, self-heal, dayOfMonth reschedule, deleted-occurrence protection)                                                                                                | PASS                                                                   |
+| Concurrency (2 `PrismaClient`, 4 OS-процесса, scheduler vs DELETE, scheduler vs PATCH)                                                                                                           | PASS, 20/20 повторов (baseline) + 3/3 (пост-review повтор), retries=0  |
+| Crash consistency (fault injection на transaction boundary, `$allOperations`)                                                                                                                    | PASS                                                                   |
+| Stage 5/6/7 regressions (полный `pnpm --filter @finora/api test`, 97 тестов — было 93, +4 после пост-review добавления multi-rule/multi-user, scheduler-vs-edit race и crash-consistency тестов) | PASS                                                                   |
+| Frontend component (список/create/edit/delete-архив/validation, dashboard-блок)                                                                                                                  | PASS, 89/89                                                            |
+| `pnpm lint` / `format:check` / `typecheck` / `build` (весь workspace)                                                                                                                            | PASS                                                                   |
+| OpenAPI/Orval (`pnpm api:generate` + `pnpm api:check`)                                                                                                                                           | PASS, воспроизводимо                                                   |
+| Playwright shell/responsive/axe (включая реальный `/recurring`)                                                                                                                                  | PASS, 15/15                                                            |
+| Docker acceptance (`pnpm test:docker`, Stage 5/6/Dashboard/Stage 8)                                                                                                                              | PASS                                                                   |
+| PostgreSQL outage с due occurrence (`recurringOutageAcceptance`)                                                                                                                                 | PASS (disposable stack, не в рамках полного `test:docker` этой сессии) |
+| Linux arm64 / non-root (отдельный `node:24-bookworm`, тот же suite)                                                                                                                              | PASS                                                                   |
+| Linux x86_64 remote CI нового Stage 8 commit                                                                                                                                                     | не выполнялся (commit/push не сделаны)                                 |
+| `git diff --check`                                                                                                                                                                               | PASS                                                                   |
+
+### Deferred scope и явные ограничения
+
+Другие частоты (weekly/daily/yearly), очереди/отдельный worker, изменение
+исторических generated transactions вместе с шаблоном, CSV, экран audit —
+намеренно вне Stage 8 по ROADMAP, не начаты. Pause/resume как отдельная от
+архива концепция не реализована — обоснование в разделе policy-решений выше.
+Настоящий Linux x86_64 host-прогон и новый remote GitHub Actions run на Stage 8
+commit не выполнены в этой сессии.
+
+### Итоговый статус
+
+**STAGE 8 LOCAL VALIDATION COMPLETE — REMOTE CI GATE PENDING.** Весь ROADMAP
+Stage 8 scope реализован, идемпотентность и конкурентность доказаны на
+уровне БД и тестами (unit/integration/Docker/Linux non-root), regression
+Stage 5–7 не нарушен, self-review завершён и найденные дефекты исправлены.
+Commit и push не выполнены — по прямому ограничению задания, не по забывчивости;
+итоговый `FINAL COMPLETE` возможен только после commit и зелёного remote
+GitHub Actions на Linux x86_64 для этого коммита.

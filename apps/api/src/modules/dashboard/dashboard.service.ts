@@ -24,7 +24,10 @@ export class DashboardService {
     const from = monthRange(months[0]!.year, months[0]!.month).gte;
     return this.prisma.client.$transaction(
       async (db) => {
-        // Не более пяти SELECT независимо от количества операций/категорий/месяцев.
+        // Не более семи SELECT независимо от количества операций/категорий/месяцев:
+        // owner(1) + monthly trend(1) + категории расходов(1) + budgets с
+        // include category(2, отдельным relation-запросом) + Stage 8 upcoming
+        // recurring с include category(2, тот же relation-паттерн, LIMIT 5).
         // Первый SELECT фиксирует снимок, валюта и все блоки читаются из него.
         const owner = await db.user.findUniqueOrThrow({
           where: { id: userId },
@@ -52,6 +55,12 @@ export class DashboardService {
           where: { userId, year: q.year, month: q.month },
           include: { category: true },
           orderBy: { id: 'asc' },
+        });
+        const upcoming = await db.recurringTransaction.findMany({
+          where: { userId, archivedAt: null },
+          include: { category: true },
+          orderBy: [{ nextOccurrenceDate: 'asc' }, { id: 'asc' }],
+          take: 5,
         });
         const trend = months.map((m) => {
           const row = monthly.find(
@@ -96,7 +105,19 @@ export class DashboardService {
           topCategories: distribution.slice(0, 5),
           budgets,
         };
-        return { ...data, insights: insights(data, trend[4]!) };
+        return {
+          ...data,
+          insights: insights(data, trend[4]!),
+          upcomingRecurring: upcoming.map((r) => ({
+            id: r.id,
+            category: categoryView(r.category),
+            type: r.type,
+            amount: r.amount.toFixed(),
+            currency: r.currency,
+            description: r.description,
+            nextOccurrenceDate: r.nextOccurrenceDate.toISOString().slice(0, 10),
+          })),
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     );

@@ -12,7 +12,7 @@ import { useAuth } from '../auth/auth-context';
 import { useDashboard } from './api';
 import { ExpenseChart, TrendChart } from './Charts';
 import { monthLabel } from './month-label';
-import { moneyText, todayInZone } from '../finance/format';
+import { dateText, moneyText, todayInZone } from '../finance/format';
 import { BudgetMonthPicker } from '../finance/BudgetMonthPicker';
 import { BudgetProgress } from '../finance/BudgetProgress';
 import { CategoryMark } from '../finance/CategoryMark';
@@ -241,11 +241,33 @@ export function Dashboard() {
               </Section>
             </Card>
             <Card className="dashboard-panel">
-              <Section title="Ближайшие регулярные операции">
-                <p className="dashboard-empty">
-                  Регулярные операции пока недоступны. Здесь пока нет
-                  расписания.
-                </p>
+              <Section
+                title="Ближайшие регулярные операции"
+                description="Активные правила по возрастанию даты, независимо от выбранного месяца."
+              >
+                {data.upcomingRecurring.length ? (
+                  <ul className="dashboard-list dashboard-recurring">
+                    {data.upcomingRecurring.map((r) => (
+                      <li key={r.id}>
+                        <CategoryMark category={r.category} />
+                        <span className="dashboard-recurring__date">
+                          {dateText(r.nextOccurrenceDate)}
+                        </span>
+                        <strong
+                          className={`numeric dashboard-recurring__amount dashboard-recurring__amount--${r.type === 'INCOME' ? 'income' : 'expense'}`}
+                        >
+                          {r.type === 'INCOME' ? '+' : '−'}
+                          {moneyText(r.amount, r.currency)}
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="dashboard-empty">
+                    Активных регулярных операций нет. Настройте расписание в
+                    разделе «Регулярные операции».
+                  </p>
+                )}
               </Section>
             </Card>
           </div>

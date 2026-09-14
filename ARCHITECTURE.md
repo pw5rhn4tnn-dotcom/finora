@@ -582,15 +582,34 @@ shell получил отдельную прокрутку содержимог�
 0001-01…9999-12. Ошибки используют существующие Problem Details.
 
 `DashboardService` читает основной currency и агрегаты в одной PostgreSQL
-Repeatable Read transaction. Не более пяти SELECT на снимок: currency владельца,
-monthly GROUP BY за шесть месяцев, category GROUP BY выбранного месяца,
-бюджеты выбранного месяца и категории этих бюджетов. Никаких полных transaction
-списков, запросов по одному месяцу/категории и materialized счетчиков.
-Все financial queries содержат owner predicate; category join дополнительно
-сопоставляет обоих владельцев. При отсутствии бюджетов Prisma пропускает SELECT
-их категорий. Существующие индексы Stage 2 покрывают owner/DATE и owner/type/DATE;
-новая миграция не нужна. Integration проверяет число SELECT на 10 000 операций,
-EXPLAIN ANALYZE и запись между двумя SUM в одном чтении.
+Repeatable Read transaction. На момент Stage 7 — не более пяти SELECT на снимок:
+currency владельца, monthly GROUP BY за шесть месяцев, category GROUP BY
+выбранного месяца, бюджеты выбранного месяца и категории этих бюджетов.
+Никаких полных transaction списков, запросов по одному месяцу/категории и
+materialized счетчиков. Все financial queries содержат owner predicate;
+category join дополнительно сопоставляет обоих владельцев. При отсутствии
+бюджетов Prisma пропускает SELECT их категорий. Существующие индексы Stage 2
+покрывают owner/DATE и owner/type/DATE; новая миграция не нужна. Integration
+проверяет число SELECT на 10 000 операций, EXPLAIN ANALYZE и запись между двумя
+SUM в одном чтении.
+
+**Stage 8 update:** снимок расширен шестым источником — `upcomingRecurring`
+(ближайшие 5 активных recurring-правил, `include: { category: true }`, тот же
+relation-паттерн, что у бюджетов). Prisma без `relationJoins`/driver-adapter
+не умеет схлопывать `include` в один SQL JOIN (проверено эмпирически — в
+сгенерированном клиенте 7.10 нет `relationLoadStrategy`), поэтому relation
+батчится вторым SELECT, как и у бюджетов: основной запрос + один batched
+запрос категорий (`WHERE id IN (...)`), не по одному на строку. Инвариант
+обновлён до **не более семи SELECT**, где рост с 5 до 7 — это ровно одна
+дополнительная relation-пара (+2), привязанная к `LIMIT 5` и не растущая с
+объёмом истории (тот же bounded/O(1)-профиль, что и остальные пять запросов).
+Переписывать этот путь на ручной `JOIN`/`row_to_json`, чтобы искусственно
+вернуться к пяти SELECT, не стали: это увеличило бы объём и хрупкость кода
+ради самого числа запросов, а не ради производительности (batched
+relation-запрос по индексированному первичному ключу с ограничением в 5 строк
+не создаёт N+1 и не заметен на фоне остальных агрегатов). Integration-тест
+(`apps/api/test/dashboard.test.ts`, Stage 7 volume-кейс) обновлён на ≤7 и
+фиксирует ровно эту причину прямо в assertion.
 
 SUM выполняется над сохранённым `amountInBaseCurrency` в PostgreSQL и передаётся
 как decimal text. `dashboard-calculations` использует Decimal precision 60,
