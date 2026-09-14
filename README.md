@@ -138,6 +138,13 @@ queries/mutations, текущее значение сессии заменяет
 расширенному режиму нужны host pnpm/dependencies и Chromium. Обычный
 `pnpm test:docker` по-прежнему требует только Node/Git/Docker на хосте.
 Оба режима используют свои чистые копии, контейнеры и volumes с cleanup.
+Browser runner также поднимает отдельный Compose для intentional rate-limit test:
+его API process/БД не разделяют состояние с обычным auth/finance suite, production
+лимиты сохранены. При ручном запуске auth compose spec требуются оба origin:
+`FINORA_COMPOSE_URL` основного окружения и `FINORA_SECURITY_COMPOSE_URL` отдельного
+чистого security окружения. Повторный запуск security test требует нового окружения,
+поскольку он намеренно исчерпывает register bucket. Setup sessions и test data
+не зависят от выполнения других test cases; подробности — в frontend README.
 
 ## Разработка вне Docker
 

@@ -60,6 +60,17 @@ jobs:
         run: pnpm api:check
       - name: Проверить auth и финансовый CRUD через Nginx и PostgreSQL в браузере
         run: pnpm test:e2e:auth
+      - name: Сохранить диагностику browser failure
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: browser-failure
+          path: |
+            apps/web/test-results/**/trace.zip
+            apps/web/test-results/**/test-failed-*.png
+            apps/web/test-results/**/error-context.md
+          retention-days: 7
+          if-no-files-found: ignore
   docker:
     name: Чистый и повторный Docker startup
     runs-on: ubuntu-latest

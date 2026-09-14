@@ -518,7 +518,9 @@ pageSize 10/25/50. /categories/options — явный компактный сп�
 Frontend pages компонуют finance features и shared primitives. Query keys:
 ['finance', userId, resource, params]; abort signal передаётся generated client.
 Mutations без retry используют прежний account-write boundary, блокирующий logout.
-Списки и session lock инвалидируются после server success; 401 очищает сессию,
+После server success незавершённые finance-чтения владельца отменяются, затем
+списки и session lock инвалидируются. Это включает первый GET нового фильтра,
+который иначе мог вернуть snapshot до мутации вместо нового refetch. 401 очищает сессию,
 late response другого владельца не меняет новую сессию. Дополнительная очистка
 AuthProvider после anonymous render удаляет пересозданные уходящим observer queries.
 Skip link находится в AuthBoundary и остаётся доступным во время загрузки сессии.

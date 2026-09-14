@@ -238,3 +238,24 @@ StorageState setup не следует публиковать вместе с PN
 viewport, затем 12 viewport на четырёх workers. Обычный suite обязан завершиться
 без ошибок; в него намеренные падения не добавляются. Локальный PASS на macOS
 не доказывает переносимость Linux; диагностика remote run описана в REPORT.
+
+### Stage 5: DELETE race и независимые compose cases
+
+После DELETE 204 mutation отменяет незавершённые finance queries владельца перед
+invalidation. Это необходимо для первого GET нового search-фильтра: у него ещё нет
+cached data, и обычная invalidation могла присоединиться к snapshot до DELETE.
+Dialog закрывается после successful mutation и обновления; 429/503 остаются внутри
+подтверждения. Component и Compose regressions управляют доставкой snapshot,
+проверяют исчезновение удалённой строки и фактический refetch без retries/sleeps.
+
+Auth/finance теперь зависят от отдельного `compose-auth` setup: immutable session
+files лежат в его outputDir; каждый case получает новый context. Responsive profile
+создаётся независимо от UI registration test; finance cases создают собственные
+уникальные category/transaction и удаляют их в fixture finally. Можно выбирать
+отдельный responsive case без CRUD-предшественника и запускать workers=1/2/4.
+
+Для `auth.compose.spec.ts` требуется `FINORA_SECURITY_COMPOSE_URL` отдельного
+чистого Compose. Его intentional limiter test не делит API process/DB с
+`FINORA_COMPOSE_URL`. `pnpm test:e2e:auth` подготавливает и удаляет оба окружения
+автоматически. Лимиты и защита X-Forwarded-For проверяются без изменения production
+конфигурации. Budget setup/regression остаются независимыми от `compose-auth`.

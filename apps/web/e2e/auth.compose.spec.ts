@@ -1,11 +1,11 @@
-import { expect, test, type Page, type BrowserContext } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect, profilePassword } from './compose-session';
+import { z } from 'zod';
 import AxeBuilder from '@axe-core/playwright';
 
 // Настоящие Nginx, NestJS и PostgreSQL. Моки используются только в явно
 // названных проверках сбоя сети/загрузки ниже.
-test.describe.configure({ mode: 'serial' });
-let registeredCookies: Awaited<ReturnType<BrowserContext['cookies']>> = [];
-const password = 'Stage4-strong-password!';
+const password = profilePassword;
 async function login(
   page: Page,
   email = 'personal@finora.example',
@@ -38,7 +38,9 @@ async function axe(page: Page) {
 test('регистрация → профиль → reload → logout → login; validation и cookie', async ({
   page,
   context,
+  unique,
 }) => {
+  const email = `new-${unique}@stage4.example`;
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/settings');
@@ -51,7 +53,9 @@ test('регистрация → профиль → reload → logout → login;
   await expect(page.getByRole('alert')).toContainText('Проверьте');
   await expect(page.getByLabel('Имя профиля')).toBeFocused();
   await page.getByLabel('Имя профиля').fill('Новый пользователь');
-  await page.getByLabel('Email', { exact: true }).fill(' NEW@STAGE4.EXAMPLE ');
+  await page
+    .getByLabel('Email', { exact: true })
+    .fill(` ${email.toUpperCase()} `);
   await page.getByLabel('Пароль', { exact: true }).fill(password);
   await page.getByLabel('Основная валюта').selectOption('EUR');
   await page.getByLabel('Часовой пояс').selectOption('UTC');
@@ -73,9 +77,7 @@ test('регистрация → профиль → reload → logout → login;
     'finora_session',
   );
   await page.goto('/settings');
-  await expect(
-    page.getByText('new@stage4.example', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
   await expect(page.getByLabel('Основная валюта')).toBeEnabled();
   await page.getByLabel('Основная валюта').selectOption('USD');
   await page.getByLabel('Часовой пояс').selectOption('Europe/Moscow');
@@ -92,10 +94,9 @@ test('регистрация → профиль → reload → logout → login;
       (cookie) => cookie.name === 'finora_session',
     ),
   ).toBe(false);
-  await login(page, 'new@stage4.example', password);
+  await login(page, email, password);
   await page.goto('/settings');
   await expect(page.getByLabel('Основная валюта')).toHaveValue('USD');
-  registeredCookies = await context.cookies();
   expect(errors).toEqual([]);
 });
 test('demo аккаунты изолированы; семейный профиль не получает настройки личного', async ({
@@ -171,6 +172,7 @@ for (const [width, height] of [
   test(`auth и профиль: responsive, reflow и axe ${width}×${height}`, async ({
     page,
     context,
+    sessions,
   }) => {
     await page.setViewportSize({ width, height });
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -187,7 +189,7 @@ for (const [width, height] of [
     });
     await page.getByLabel('Имя профиля').fill('ОченьДлинноеИмя'.repeat(6));
     await noOverflow(page);
-    await context.addCookies(registeredCookies);
+    await context.addCookies(sessions.profile.cookies);
     await page.goto('/settings');
     await expect(page.getByLabel('Основная валюта')).toHaveValue('USD');
     await noOverflow(page);
@@ -206,10 +208,13 @@ for (const [width, height] of [
     await noOverflow(page);
   });
 }
-test('keyboard-only login, pending и ошибки не теряются', async ({ page }) => {
+test('keyboard-only login, pending и ошибки не теряются', async ({
+  page,
+  sessions,
+}) => {
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).focus();
-  await page.keyboard.type('new@stage4.example');
+  await page.keyboard.type(sessions.email);
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Пароль', { exact: true })).toBeFocused();
   await page.keyboard.type(password);
@@ -233,20 +238,98 @@ test('keyboard-only login, pending и ошибки не теряются', async
 });
 
 test('Nginx сохраняет Origin policy и не позволяет обойти rate limit подменой X-Forwarded-For', async ({
-  request,
-  baseURL,
+  playwright,
+  request: application,
+  baseURL: applicationURL,
 }) => {
-  const denied = await request.post('/api/v1/auth/logout', {
-    headers: { Origin: 'https://evil.example' },
-  });
-  expect(denied.status()).toBe(403);
-  const statuses: number[] = [];
-  for (let index = 0; index < 8; index++) {
-    const response = await request.post('/api/v1/AUTH/REGISTER/', {
-      headers: { Origin: baseURL!, 'X-Forwarded-For': `192.0.2.${index + 1}` },
+  const baseURL = process.env.FINORA_SECURITY_COMPOSE_URL;
+  if (!baseURL)
+    throw new Error(
+      'Нужен отдельный FINORA_SECURITY_COMPOSE_URL из Compose runner',
+    );
+  const request = await playwright.request.newContext({ baseURL });
+  try {
+    const denied = await request.post('/api/v1/auth/logout', {
+      headers: { Origin: 'https://evil.example' },
+    });
+    expect(denied.status()).toBe(403);
+    const statuses: number[] = [];
+    for (let index = 0; index < 8; index++) {
+      const response = await request.post('/api/v1/AUTH/REGISTER/', {
+        headers: {
+          Origin: baseURL,
+          'X-Forwarded-For': `192.0.2.${index + 1}`,
+        },
+        data: {},
+      });
+      statuses.push(response.status());
+    }
+    expect(statuses).toEqual([400, 400, 400, 400, 400, 429, 429, 429]);
+    // Новый context того же ingress наследует IP bucket, несмотря на новые cookies.
+    const otherContext = await playwright.request.newContext({ baseURL });
+    try {
+      const blocked = await otherContext.post('/api/v1/auth/register', {
+        headers: { Origin: baseURL, 'X-Forwarded-For': '198.51.100.99' },
+        data: {},
+      });
+      expect(blocked.status()).toBe(429);
+      expect(
+        z.object({ type: z.string() }).parse(await blocked.json()).type,
+      ).toBe('rate_limit');
+    } finally {
+      await otherContext.dispose();
+    }
+    // Исчерпание отдельного security backend не загрязняет основной browser suite.
+    const unaffected = await application.post('/api/v1/auth/register', {
+      headers: { Origin: applicationURL! },
       data: {},
     });
-    statuses.push(response.status());
+    expect(unaffected.status()).toBe(400);
+    const login = await request.post('/api/v1/auth/login', {
+      headers: { Origin: baseURL },
+      data: {
+        email: 'personal@finora.example',
+        password: 'Finora-Personal-2026!',
+      },
+    });
+    expect(login.status()).toBe(200);
+    const options = await request.get('/api/v1/categories/options');
+    expect(options.status()).toBe(200);
+    const categories = z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          type: z.string(),
+          archivedAt: z.string().nullable(),
+        }),
+      )
+      .parse(await options.json());
+    const category = categories.find(
+      (category) => category.type === 'EXPENSE' && !category.archivedAt,
+    )!;
+    const created = await request.post('/api/v1/transactions', {
+      headers: { Origin: baseURL },
+      data: {
+        categoryId: category.id,
+        type: 'EXPENSE',
+        currency: 'RUB',
+        amount: '1',
+        transactionDate: '2026-09-14',
+        description: 'Проверка отдельных rate policies',
+      },
+    });
+    expect(created.status()).toBe(201);
+    const record = z
+      .object({ id: z.string().uuid() })
+      .parse(await created.json());
+    expect(
+      (
+        await request.delete(`/api/v1/transactions/${record.id}`, {
+          headers: { Origin: baseURL },
+        })
+      ).status(),
+    ).toBe(204);
+  } finally {
+    await request.dispose();
   }
-  expect(statuses.at(-1)).toBe(429);
 });

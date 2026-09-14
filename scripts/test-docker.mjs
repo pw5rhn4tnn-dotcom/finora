@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { financeAcceptance } from './finance-acceptance.mjs';
 import { budgetAcceptance } from './budget-acceptance.mjs';
+import { securityCompose } from './security-compose.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, copyFile, rm } from 'node:fs/promises';
@@ -13,6 +14,7 @@ const exec = promisify(execFile);
 const checkout = await mkdtemp(join(tmpdir(), 'finora-compose-'));
 const project = `finora-acceptance-${process.pid}`;
 let browserOutput;
+let security;
 const env = {
   ...process.env,
   WEB_PORT: '0',
@@ -205,6 +207,8 @@ try {
       FINORA_PLAYWRIGHT_OUTPUT_DIR: browserOutput,
     };
     console.log(`Browser artifacts: ${browserOutput}`);
+    security = await securityCompose(checkout, project, env);
+    browserEnv.FINORA_SECURITY_COMPOSE_URL = await security.start();
     // Сначала сохранены все прежние проверки dataset/readiness/restart.
     const browserUrl = `http://${(await compose('port', 'web', '80')).trim()}`;
     env.AUTH_ORIGINS = browserUrl;
@@ -260,16 +264,19 @@ try {
 } catch (error) {
   if (error.stdout) console.error(error.stdout);
   if (error.stderr) console.error(error.stderr);
+  if (security) console.error(await security.logs());
   console.error(
     await compose('logs', '--no-color').catch(() => 'Логи недоступны'),
   );
   throw error;
 } finally {
   if (browserOutput)
-    await rm(join(browserOutput, 'budgets-auth'), {
-      recursive: true,
-      force: true,
-    });
+    for (const setup of ['budgets-auth', 'compose-auth'])
+      await rm(join(browserOutput, setup), {
+        recursive: true,
+        force: true,
+      });
+  if (security) await security.close();
   await compose('down', '-v', '--remove-orphans');
   await rm(checkout, { recursive: true, force: true });
   console.log('Acceptance environment остановлен, его volume удалён');

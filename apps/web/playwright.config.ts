@@ -12,7 +12,7 @@ export default defineConfig({
     : { testIgnore: '**/*.compose.spec.ts' }),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.FINORA_COMPOSE_URL ? 0 : process.env.CI ? 1 : 0,
+  retries: 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: 'list',
   use: {
@@ -31,14 +31,27 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      ...(process.env.FINORA_COMPOSE_URL
+        ? { dependencies: ['compose-auth'] }
+        : {}),
       testIgnore: process.env.FINORA_COMPOSE_URL
-        ? ['**/budgets.compose.spec.ts', '**/budgets.setup.ts']
+        ? ['**/budgets.compose.spec.ts', '**/*.setup.ts']
         : ['**/*.compose.spec.ts', '**/*.setup.ts'],
       outputDir: join(outputRoot, 'chromium'),
       use: { browserName: 'chromium' },
     },
     ...(process.env.FINORA_COMPOSE_URL
       ? [
+          {
+            name: 'compose-auth',
+            testMatch: '**/compose.setup.ts',
+            outputDir: join(outputRoot, 'compose-auth'),
+            use: {
+              browserName: 'chromium' as const,
+              trace: 'off' as const,
+              screenshot: 'off' as const,
+            },
+          },
           {
             name: 'budgets-auth',
             testMatch: '**/budgets.setup.ts',

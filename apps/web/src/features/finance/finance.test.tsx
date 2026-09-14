@@ -1,4 +1,11 @@
-import { render, screen, within, waitFor, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  within,
+  waitFor,
+  act,
+  fireEvent,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -266,35 +273,99 @@ test('Редактирование использует PATCH и сохранё�
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(requests.filter((r) => r.init?.method === 'PATCH')).toHaveLength(1);
 });
-test('Удаление: confirmation, cancel, failure без исчезновения, pending и success', async () => {
-  const hold = deferred();
-  let count = 0;
-  const { requests } = setup((url, init) =>
-    url.pathname.includes(transaction.id) && init?.method === 'DELETE'
-      ? ++count === 1
-        ? problem(503)
-        : hold.promise
-      : undefined,
-  );
-  await userEvent.click(await screen.findByRole('button', { name: 'Удалить' }));
-  await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
-  expect(requests.filter((r) => r.init?.method === 'DELETE')).toHaveLength(0);
-  await userEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+for (const status of [429, 503])
+  test(`Удаление: ${status}, cancel, ошибка остаётся в dialog, pending и success`, async () => {
+    const hold = deferred();
+    let count = 0;
+    let deleted = false;
+    const { requests } = setup((url, init) => {
+      if (url.pathname.includes(transaction.id) && init?.method === 'DELETE') {
+        if (++count === 1) return problem(status);
+        return hold.promise.then((response) => {
+          deleted = true;
+          return response;
+        });
+      }
+      if (deleted && url.pathname.endsWith('/transactions'))
+        return Response.json({ items: [], page: 1, pageSize: 25, total: 0 });
+      return undefined;
+    });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Удалить' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(requests.filter((r) => r.init?.method === 'DELETE')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Подтвердить удаление' }),
+    );
+    expect(
+      await within(screen.getByRole('dialog')).findByRole('alert'),
+    ).toBeDefined();
+    expect(screen.getByRole('table', { hidden: true }).textContent).toContain(
+      transaction.description,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Подтвердить удаление' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Удаляем…' }).hasAttribute('disabled'),
+    ).toBe(true);
+    hold.resolve(new Response(null, { status: 204 }));
+    expect(await screen.findByText('Операция удалена.')).toBeDefined();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText(transaction.description)).toBeNull();
+    expect(requests.filter((r) => r.init?.method === 'DELETE')).toHaveLength(2);
+  });
+test('DELETE во время первого GET нового фильтра не оставляет удалённую строку', async () => {
+  const stale = deferred();
+  let deleted = false;
+  let searches = 0;
+  const { requests } = setup((url, init) => {
+    if (init?.method === 'DELETE') {
+      deleted = true;
+      return new Response(null, { status: 204 });
+    }
+    if (
+      url.pathname.endsWith('/transactions') &&
+      url.searchParams.has('search')
+    ) {
+      searches++;
+      if (searches === 1) return stale.promise;
+      return Response.json({ items: [], page: 1, pageSize: 25, total: 0 });
+    }
+    return undefined;
+  });
+  const remove = await screen.findByRole('button', { name: 'Удалить' });
+  // В одном JS turn: debounce начнёт новый GET уже при открытом подтверждении.
+  act(() => {
+    fireEvent.change(screen.getByLabelText('Поиск'), {
+      target: { value: 'Покупка' },
+    });
+    fireEvent.click(remove);
+  });
+  await waitFor(() => expect(searches).toBe(1));
   await userEvent.click(
     screen.getByRole('button', { name: 'Подтвердить удаление' }),
   );
-  expect(await screen.findByRole('alert')).toBeDefined();
-  expect(screen.getByRole('table', { hidden: true }).textContent).toContain(
-    transaction.description,
-  );
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Подтвердить удаление' }),
-  );
+  await waitFor(() => expect(deleted).toBe(true));
+  // Ответ содержит snapshot, прочитанный сервером ДО успешного DELETE.
+  await act(async () => {
+    stale.resolve(
+      Response.json({ items: [transaction], page: 1, pageSize: 25, total: 1 }),
+    );
+    await stale.promise;
+  });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(
-    screen.getByRole('button', { name: 'Удаляем…' }).hasAttribute('disabled'),
-  ).toBe(true);
-  hold.resolve(new Response(null, { status: 204 }));
-  expect(await screen.findByText('Операция удалена.')).toBeDefined();
+    screen
+      .queryAllByRole('row')
+      .filter((row) => row.textContent?.includes(transaction.description)),
+  ).toHaveLength(0);
+  expect(searches).toBe(2);
+  expect(
+    requests.filter((request) => request.init?.method === 'DELETE'),
+  ).toHaveLength(1);
 });
 test('Поиск/фильтры/pagination отправляются серверу; смена фильтра сбрасывает page', async () => {
   const { requests } = setup(undefined, '/transactions?page=3&pageSize=10');

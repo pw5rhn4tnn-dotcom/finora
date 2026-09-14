@@ -88,6 +88,11 @@ export function useFinancialMutation<T, R = unknown>(
     onSuccess: async (result) => {
       if (client.getQueryData<UserDto | null>(sessionKey)?.id !== user?.id)
         return;
+      // Первый GET нового фильтра ещё не имеет data. invalidateQueries в этом
+      // случае присоединяется к старому запросу вместо его отмены: snapshot до
+      // мутации мог бы вернуть уже удалённую строку. Сначала отменяем все чтения
+      // владельца, затем обязательно запрашиваем данные после server success.
+      await client.cancelQueries({ queryKey: ['finance', user?.id] });
       await client.invalidateQueries({ queryKey: ['finance', user?.id] });
       await client.invalidateQueries({ queryKey: sessionKey });
       if (client.getQueryData<UserDto | null>(sessionKey)?.id === user?.id)

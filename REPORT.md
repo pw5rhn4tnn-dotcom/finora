@@ -1353,3 +1353,217 @@ scripts/check-stage6-e2e.mjs. ARCHITECTURE.md прочитан; приложен
 результат для них не получен. Повторный запуск старого SHA не проверил бы рабочую
 копию. Stage 6 не объявляется прошедшим remote CI. Stage 7 не начат; roadmap scope
 Stage 6 сохранён. Commit, push и изменение Git history не выполнялись.
+
+## Повторный remote CI repair: Stage 5 DELETE/refetch race (2026-09-14)
+
+Работа ограничена диагностикой и repair run
+[34854794659](https://github.com/pw5rhn4tnn-dotcom/finora/actions/runs/34854794659),
+SHA `42cc23c`. Stage 7 не начинался, новая функциональность не добавлялась.
+Использован Codex и навык `diagnosing-bugs`; субагенты не использовались.
+Commit/push в этой сессии не выполнялись.
+
+### Remote evidence и границы доказательств
+
+Команда runner: `pnpm --filter @finora/web exec playwright test auth.compose.spec.ts finance.compose.spec.ts`,
+18 tests / 2 workers / retries=0. Падение Stage 5 после подтверждения удаления:
+dialog hidden, `toHaveCount(0)` получил 1. GitHub logs прочитаны через `gh`.
+Workflow создал trace на ephemeral runner, но не загрузил artifacts: API вернул
+`total_count: 0`. Поэтому оригинальный remote trace/БД после завершения job
+недоступны; их изучение или SQL-проверка задним числом не заявляются. Добавлен
+upload failing trace/screenshot/error-context без setup storageState.
+
+Remote Nginx зафиксировал конкретный запрос:
+`DELETE /api/v1/transactions/4c005571-2cb7-447d-bc14-ec9f89f105b8`,
+14:24:01 UTC, **HTTP 204, body 0 bytes**. Это та же запись, которая перед этим
+получила PATCH 200. GET нового search-фильтра прошёл непосредственно перед DELETE;
+нового GET списка после DELETE нет. HTTP 429 у этого DELETE не было.
+Backend `remove` ожидает PostgreSQL transaction с удалением и audit INSERT до 204.
+
+Все четыре remote HTTP 429 относятся к `POST /api/v1/AUTH/REGISTER/` в 14:24:21 UTC,
+то есть примерно через 20 секунд после DELETE. Инициатор — intentional auth test,
+Playwright request user-agent и X-Forwarded-For `192.0.2.5`–`.8`. В основном
+remote browser flow других 429 в Nginx log нет. Это ожидаемый результат security
+проверки, а не причина оставшейся строки.
+
+### Root cause и детерминированное воспроизведение
+
+Поиск имеет debounce 300 ms. После изменения текста новый query key начинает
+первый GET, пока confirmation dialog уже открыт. Этот GET ещё не имеет `data`
+и может читать snapshot до удаления. После DELETE 204 `useFinancialMutation`
+вызывает `invalidateQueries`. В установленном TanStack Query `Query.fetch`
+отменяет выполняющийся запрос при `cancelRefetch` только если `state.data !== undefined`.
+Для первого GET он возвращает прежний promise. Его устаревший ответ становится
+успешными данными; mutation callback закрывает dialog, не запустив чтение после DELETE.
+
+Это **production race обновления кэша**. DELETE успешен, frontend mutation и
+invalidation выполняются, frontend API error отсутствует. Dialog закрывается
+после успешного DELETE и ожидания неверно выбранного GET; premature close до
+mutation success не найден. Исходное DOM assertion корректно. Backend failure,
+duplicate row, audit rollback и 429 не объясняют зафиксированный симптом.
+
+Перед production fix четыре обычных чистых Linux/non-root прохода исходной точной
+команды дали 18/18. Однако компонентный regression с управляемым promise дал
+ровно expected 0 / received 1. Browser probe через настоящий production Nginx,
+NestJS и PostgreSQL удержал полученный до DELETE snapshot до ответа DELETE:
+`/api/v1/transactions/2f40e2cf-d15b-44fb-8dd4-510bead41c10` → 204,
+последующий detail GET → 404, PostgreSQL `exists=false`, DELETE audit с корректным
+`before` и `after=null`. После доставки старого snapshot dialog hidden,
+`toHaveCount(0)` → 1, search GET count=1. Failing trace прочитан, его network events
+сверены с Nginx/SQL. Первый probe выявил ошибку диагностического чтения пустого 204
+через Chromium; отдельный запуск сразу после restart не дождался readiness.
+Эти ошибки harness не выдаются за воспроизведение продуктового failure.
+
+Fix: после server success сначала `cancelQueries(['finance', owner])`, затем
+существующая invalidation/refetch и session invalidation. Abort signal уже передаётся
+через generated client. Даже первый незавершённый GET теперь отменяется; активный
+список перечитывается после mutation. Production лимиты, API/schema/seed/ownership,
+таймауты, retries и CRUD assertions ради green не ослаблялись. Shell retries также
+установлены в 0. Generated client вручную не редактировался.
+
+### Связь с предыдущим repair и test isolation
+
+`git diff 352d4cb HEAD` подтвердил отсутствие изменений в finance mutation helper,
+DeleteConfirmation и обоих старых auth/finance compose specs. Последний repair
+`42cc23c` изменил output paths, budget setup/dependencies и runner diagnostics,
+но сохранил точную auth+finance команду, 2 CI workers, fullyParallel и serial mode
+внутри старых файлов. Budget setup не участвовал в выборе auth+finance. Новый failure
+обнаружил существовавшую с Stage 5 гонку, прямой causal relation с Stage 6 repair нет.
+
+Прежние локальные проверки auth/finance выполнялись на macOS; Linux проверял
+budgets и Stage 6 regression. Кроме того, одиночный успешный E2E не фиксирует
+порядок GET snapshot / DELETE / response delivery. Четыре исходных Linux green
+подтверждают, что одной смены ОС недостаточно для обнаружения этой гонки.
+Прежний компонентный тест удаления проверял success notice; его mock списка
+продолжал возвращать старую строку даже после 204. Он не проверял исчезновение
+строки и первый GET нового query key. Теперь проверяются оба условия.
+
+SecurityGuard хранит process-local Map по `policy:request.ip`: login 10/min,
+register 5/hour; general API не расходует эти buckets. Nginx заменяет X-Forwarded-For
+на source IP; глобальной Nginx limit zone нет. Новые browser contexts/workers
+одного ingress делят bucket, состояние живёт до expiry/restart API. Поэтому
+intentional limiter test архитектурно вынесен на отдельные API process, Nginx и
+PostgreSQL с теми же production images и policy. Его новые assertions проверяют
+точную последовательность 400×5 → 429×3, ещё один 429 из нового context с подменой
+XFF, отсутствие 429 у register основного suite и успешные login/create/DELETE при
+исчерпанном register bucket отдельного backend. Оба окружения удаляются runner.
+
+Убрана зависимость auth/finance responsive cases от предыдущего успешного теста:
+setup project сохраняет неизменяемые sessions; каждый case получает свежий context.
+Профиль responsive подготовлен отдельно от UI registration test. Имена строятся из
+run UUID + testId + repeatEachIndex; каждый finance case создаёт собственные records,
+cleanup работает в fixture finally, удаляет транзакции перед категориями и проверяет 404. CRUD locator содержит полный уникальный suffix; DELETE привязан к ID полученного
+POST 201. Audit сохраняется; accounts/audit удаляются только вместе с acceptance volume.
+
+### Regression coverage и проверки
+
+- Компонентный тест воспроизводит первый незавершённый GET нового фильтра,
+  успешный DELETE и поздний устаревший snapshot. До fix — red 0/1; после — строка
+  отсутствует, два GET, один DELETE.
+- Compose regression управляет именно debounce через Playwright clock и доставкой
+  настоящего server snapshot через promise; проверяет 201/200/204/404, исчезновение
+  dialog/строки и второй GET. Networkidle, arbitrary sleep, skip/fixme/only нет.
+- Delete UX tests для 429 и 503 проверяют сохранение ошибки внутри dialog, отсутствие
+  потери строки при failure, pending/cancel, явный повтор пользователем и confirmed
+  success с удалением строки. Автоматического повторения mutation нет.
+- Finance responsive cases и auth profile больше не требуют выполнения CRUD/registration
+  cases до них. Отдельно проверяются specs, порядок и workers 1/2/4.
+
+Финальные результаты полного набора и stress приведены ниже.
+Диагностика этой сессии: системные временные каталоги `finora-ci-repair` и
+`finora-ci-matrix`; это фактические локальные artifacts, не пути приложения.
+Linux harness: Node 24.21.0, pnpm 12.4.1, Playwright 1.63.0 / Chromium 153,
+Debian Linux aarch64, uid=1000(node), `/private/tmp` отсутствует. Remote runner —
+Ubuntu x86_64; идентичность distro/CPU не заявляется. Production API/Nginx/PostgreSQL
+и versions/CI=1/2 workers/retries=0/setup graph воспроизведены.
+
+### Завершённые финальные checks этой сессии
+
+После последних production/test изменений выполнены проверки ниже. Изменения
+документации и diagnostic upload workflow затем отдельно проверены форматированием
+и diff check. `upload-artifact@v7.0.1`/Node 24 и его inputs сверены с официальным
+`actions/upload-artifact/action.yml`; remote upload не выполнялся.
+
+| Проверка                                                 | Результат                                                                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`                                      | Passed                                                                                                                      |
+| `pnpm lint`                                              | Passed                                                                                                                      |
+| `pnpm typecheck`                                         | Passed                                                                                                                      |
+| `pnpm test` — backend                                    | Passed, 61/61, отдельная настоящая PostgreSQL; macOS и Linux/non-root                                                       |
+| `pnpm test` — frontend                                   | Passed, 67/67; macOS и Linux/non-root                                                                                       |
+| `pnpm build`                                             | Passed, API + production frontend; macOS и Linux/non-root                                                                   |
+| `pnpm api:generate`                                      | Passed, generated files без diff; macOS и Linux/non-root                                                                    |
+| `pnpm api:check`                                         | Passed; macOS и Linux/non-root                                                                                              |
+| `pnpm test:e2e`                                          | Passed, 15/15 shell, retries=0                                                                                              |
+| `auth.compose.spec.ts` отдельно, workers=1               | Passed, 11 tests + setup                                                                                                    |
+| `finance.compose.spec.ts` отдельно, workers=1            | Passed, 8 tests + setup                                                                                                     |
+| auth + finance, workers=1                                | Passed, 19 tests + setup                                                                                                    |
+| auth + finance, workers=4                                | Passed, 19 tests + setup                                                                                                    |
+| Принудительно finance → auth, workers=1                  | Passed, 19 tests + setup                                                                                                    |
+| Только auth responsive, workers=4, без registration case | Passed, 6 tests + setup                                                                                                     |
+| Только finance responsive, workers=4, без CRUD case      | Passed, 6 tests + setup                                                                                                     |
+| `budgets.compose.spec.ts`                                | Passed, 12 tests + setup; macOS и Linux/non-root                                                                            |
+| `pnpm test:e2e:stage6-regression`                        | Passed, macOS и Linux/non-root: 5 ожидаемых worker failures → 6 viewport, затем 12 viewport при workers=4; 36 отдельных PNG |
+| `pnpm test:docker`                                       | Passed, полный отдельный Docker acceptance                                                                                  |
+| `pnpm test:e2e:auth`                                     | Passed, полный Docker + browser acceptance: 20 auth/finance/setup, 13 budget/setup, Stage 6 regression                      |
+| `git diff --check`                                       | Passed                                                                                                                      |
+
+Все matrix cases выполнены в Linux/non-root на отдельных чистых volumes. Первый
+временный config для обратного порядка оказался вне ESM package scope и не загрузился;
+его перенесли внутрь web package, затем все оставшиеся matrix checks прошли.
+Изменения приложения из-за этого не требовались. Первые host integration checks
+были заблокированы sandbox TCP EPERM; окончательный полный набор выполнен успешно
+с доступом к отдельной PostgreSQL. Эти диагностические Failed не являются final Passed
+без соответствующего успешного повторного запуска.
+
+Docker acceptance подтвердил clean/repeated startup, все services healthy,
+seed ×3 без изменения данных, outage PostgreSQL с readiness 200 → 503 → 200,
+liveness во время outage, migrate/permissions, Swagger/HTTP, financial и budget
+CRUD/ownership/Decimal/archive и persistence после seed/restart. Исходный dataset
+SHA-256: `55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Runner удалил основные и security containers/volumes и setup storageState.
+
+Полный список изменённых файлов: `.github/workflows/ci.yml`, `ARCHITECTURE.md`,
+`README.md`, `REPORT.md`, `apps/web/README.md`, `apps/web/e2e/auth.compose.spec.ts`,
+`apps/web/e2e/finance.compose.spec.ts`, `apps/web/e2e/compose-session.ts`,
+`apps/web/e2e/compose.setup.ts`, `apps/web/playwright.config.ts`,
+`apps/web/src/features/finance/api.ts`, `apps/web/src/features/finance/finance.test.tsx`,
+`scripts/test-docker.mjs`, `scripts/security-compose.mjs`.
+
+Из production кода изменён только finance query/mutation helper. Backend, Nginx
+configuration, Prisma/schema/migrations/seed, dependencies/lockfile, generated API
+client и package scripts не менялись. Stage 7 не начат; commit/push не выполнялись.
+Последний опубликованный remote run остаётся FAILED для исходного SHA. Новый remote
+run рабочей копии не запускался; локальные результаты не объявляются remote green.
+
+### Итог stress: 20 последовательных чистых проходов
+
+**Passed: 20/20**, точная команда без дополнительных Playwright flags:
+`pnpm --filter @finora/web exec playwright test auth.compose.spec.ts finance.compose.spec.ts`.
+Каждый запуск: `CI=1`, Linux aarch64, uid=1000(node), 2 workers, retries=0,
+новые main/security Compose containers и PostgreSQL volumes, те же закреплённые
+production images; outputDir уникален. 19 cases + setup на запуск, итого **400 passed**,
+0 failed/skipped/flaky/retries. Время самого Playwright: **20.4–32.4 s** на запуск.
+
+После каждого запуска runner проверил 288 оставшихся seed-транзакций; общий
+финальный анализ 20 HTTP/DB snapshots подтвердил:
+
+- **180/180 transaction DELETE → HTTP 204, body 0 bytes**, включая cleanup;
+- 40 DELETE audits для исходного CRUD и управляемого race regression: ID совпадает
+  со snapshot, `before` сохранён, `after=null`, соответствующих транзакций в БД нет;
+- **0 HTTP 429 в основном suite**;
+- по 4 ожидаемых register 429 на отдельном security backend в каждом запуске;
+- все 20 root-cause regressions проверили второй GET после DELETE и отсутствие строки.
+
+Серия выполнена двумя последовательными блоками 1–10 и 11–20 на одном неизменном
+production/test коде. Между проходами создавались чистые environments, повторного
+запуска упавшего case не было. До fix отдельно зафиксированы четыре обычных Linux
+18/18 green и детерминированные red component/browser probes; они не включены в
+финальный stress счётчик. Эта проверка даёт повторяемое локальное evidence, не
+является обещанием отсутствия любых будущих CI failures.
+
+Артефакты финальной сверки: `/private/tmp/finora-ci-repair/verified-stress-1-20.json`,
+`stress-1.log` … `stress-20.log` и соответствующие `-http.log`, `-db.json`,
+`-security.log`; failing Linux trace — `trace-red-3/`, SQL — `race-db.json`.
+Полные checks: `final-gates/`, `linux-gates.log`, `final-docker-acceptance.log`,
+`final-browser-acceptance.log`; matrix — `/private/tmp/finora-ci-matrix/`,
+Linux Stage 6 — `/private/tmp/finora-ci-stage6/result.log`.
