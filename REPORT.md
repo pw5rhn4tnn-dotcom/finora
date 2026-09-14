@@ -1856,7 +1856,7 @@ reset чужих изменений и новый remote CI не выполня�
   релиз `actions/runner-images` (`ubuntu24/20260907.300`) — это реальные метаданные
   образа GitHub-hosted runner, а не предположение по имени `runs-on`;
 - `Настроить Node.js` в обоих job показывает `Acquiring 24.21.0 - x64 from
-  .../node-24.21.0-linux-x64.tar.gz` — Node установлен именно как linux-x64 бинарник;
+.../node-24.21.0-linux-x64.tar.gz` — Node установлен именно как linux-x64 бинарник;
 - `pnpm install` качает нативные бинарники `@rolldown/binding-linux-x64-gnu`;
 - шаг установки Chromium работает с `apt`-репозиторием архитектуры `amd64`
   (`noble-updates/main amd64 Packages`, `.../restricted amd64 Packages` и т.д.).
