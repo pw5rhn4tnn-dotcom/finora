@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0 зафиксирован в Git; Stage 1 — Foundation локально готов, обязательные локальные проверки пройдены. Remote CI — pending verification. Stage 2 — Database & Docker Foundation локально завершён, обязательные проверки пройдены; Stage 3–12 не начаты. Это порядок будущих работ, фактическая история находится в [REPORT.md](REPORT.md). Продуктовые правила и приемка — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), механизмы реализации — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0 зафиксирован в Git; Stage 1 — Foundation локально готов, обязательные локальные проверки пройдены. Remote CI — pending verification. Stage 2 — Database & Docker Foundation локально завершён, обязательные проверки пройдены; Stage 3 — Design System & App Shell локально завершён; Stage 4–12 не начаты. Это порядок будущих работ, фактическая история находится в [REPORT.md](REPORT.md). Продуктовые правила и приемка — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), механизмы реализации — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -55,6 +55,11 @@
 **Документация / REPORT:** фактические команды и адреса в README, правила локального HTTP/секретов, точность денег, поведение seed, подтвержденные результаты startup. Demo credentials публикуются только если уже созданы и проверены.
 
 ## Stage 3 — Design System & App Shell
+
+**Фактическое состояние:** реализован; tokens/light theme, primitives, Query provider,
+routing/sidebar/bottom navigation, responsive Sheet и каркас полей/фильтров готовы.
+Vitest и браузерные Playwright/axe проверки добавлены в текущий pipeline. Результаты
+локальной валидации и ограничения перечислены в REPORT. Требования ниже сохранены.
 
 **Цель:** получить доступную адаптивную оболочку и основу визуального качества.
 

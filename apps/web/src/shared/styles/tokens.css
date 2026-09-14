@@ -1,0 +1,91 @@
+/* Единственный источник визуальных значений. Light — тема по умолчанию. */
+@theme static {
+  --color-*: initial;
+  --color-background: #f6f7fb;
+  --color-foreground: #202539;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f0f2f8;
+  --color-muted: #e5e8f0;
+  --color-border: #dce0eb;
+  --color-input-border: #81899d;
+  --color-primary: #4338a3;
+  --color-primary-hover: #372d8b;
+  --color-primary-active: #2d2573;
+  --color-primary-soft: #eeecfc;
+  --color-on-primary: #ffffff;
+  --color-success: #167047;
+  --color-success-soft: #eaf6ef;
+  --color-warning: #885408;
+  --color-warning-soft: #fff5df;
+  --color-danger: #b02e3e;
+  --color-danger-hover: #922536;
+  --color-danger-active: #791e2c;
+  --color-danger-soft: #fff0f1;
+  --color-income: #167047;
+  --color-expense: #b02e3e;
+  --color-focus: #5142bc;
+  --color-disabled: #e9ebf1;
+  --color-text-disabled: #737a8c;
+  --color-text-secondary: #596278;
+  --color-text-muted: #697287;
+  --color-overlay: #20253966;
+
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text-*: initial;
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.2;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.25;
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.4;
+  --text-card: 1rem;
+  --text-card--line-height: 1.5;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-secondary: 0.875rem;
+  --text-secondary--line-height: 1.5;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.5;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.4;
+  --text-financial: 2rem;
+  --text-financial--line-height: 1.25;
+
+  --spacing: 0.25rem;
+  --radius-*: initial;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --shadow-*: initial;
+  --shadow-sm: 0 1px 2px #20253908;
+  --shadow-md: 0 8px 32px #20253914;
+  --breakpoint-*: initial;
+  --breakpoint-tablet: 48rem;
+  --breakpoint-desktop: 64rem;
+  --breakpoint-wide: 90rem;
+}
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --border-width: 1px;
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 250ms;
+  --duration-skeleton: 1500ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --content-width: 75rem;
+  --reading-width: 36rem;
+  --sidebar-width: 14rem;
+  --sidebar-wide-width: 15.5rem;
+  --bottom-nav-height: 5rem;
+  --control-height: 2.75rem;
+  --sheet-width: 30rem;
+  --z-navigation: 20;
+  --z-overlay: 40;
+  --z-dialog: 50;
+  --z-skip-link: 60;
+}

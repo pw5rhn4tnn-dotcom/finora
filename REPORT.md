@@ -448,3 +448,194 @@ volumes удалены; dev/start процессы завершены, docker ps
 контейнеров. Stage 2 локально завершён; Stage 3+ не реализован.
 
 Предлагаемый commit: `feat(database): добавить PostgreSQL, Prisma и Docker-инфраструктуру`.
+
+## 14.09.2026 — Stage 3: Design System & App Shell
+
+### Preflight и решения до реализации
+
+Codex desktop; прочитаны все семь канонических документов (обрезанные выводы
+дочитаны диапазонами), frontend, workspace, smoke tests, Docker runner и CI.
+Рабочее дерево чистое; HEAD `cfa8733` содержит Stage 2. Подагенты не используются.
+`rg` отсутствует, инвентаризация выполнена через find/sed. Commit/push запрещены.
+
+Реальный фрагмент запроса: «Это должен быть реальный reusable design system,
+а не набор случайно стилизованных компонентов внутри одной страницы».
+План: shared tokens/UI → app providers/router/shell → presentation pages →
+компонентные и браузерные проверки → полный pipeline и self-review.
+
+Roadmap дополнительно явно включает Query providers, sheets/dialogs и каркас
+форм/фильтров. Эти требования сохраняются, хотя в prompt dialog условный.
+Dark mode допустим prompt как nice-to-have, но исключён Stage 3 roadmap:
+реализуется только полноценная light theme. Продуктового противоречия нет;
+канонические PROJECT/DISCOVERY/AI_RULES не меняются.
+
+Проверены официальные npm metadata и документация React Router, Tailwind, Radix.
+React Router 8.3.1 совместим с закреплёнными Node 24.21/React 19.3; Tailwind
+4.3.3 Vite plugin поддерживает Vite 8. Добавляются только предусмотренные стеком
+Router, Query provider, Tailwind, Lucide, точечные Radix Dialog/Slot; большая UI
+библиотека и shadcn CLI не нужны. Локальные типизированные primitives следуют
+подходу shadcn (код принадлежит проекту, сложная доступность — Radix).
+Motion/Recharts/RHF/Zod отложены до реальной потребности. Для поведения нужны
+user-event и Playwright; axe используется только в браузерных тестах.
+Lucide выбран 1.41.0 от 04.09, вместо выпущенного сегодня latest, без исключения
+release-age policy. Ни одна прежняя прямая dependency не обновляется.
+
+Результаты реализации и проверок будут записаны после их фактического выполнения.
+
+### Реализованная архитектура и визуальная система
+
+`shared/styles/tokens.css` — единый источник CSS custom properties и Tailwind
+semantic utilities (`@theme static`). Полная светлая палитра: surfaces, border
+и отдельный контрастный input-border, indigo primary/hover/active, semantic
+success/income, danger/expense, warning, focus и disabled, текстовые уровни.
+Системный sans-serif с кириллицей не требует загрузки; финансовый стиль имеет
+табличные цифры, spacing — кратность 4px, radius 6/8/12px, две сдержанные тени,
+border 1px, focus 2px/offset 3px. Durations 150/200/250ms, skeleton pulse 1500ms;
+reduced motion отключает анимации и transitions. Light задан на html до mount,
+нативные controls согласованы через color-scheme. Dark mode не реализован.
+
+`shared/ui` содержит типизированные Button/ButtonLink/IconButton, Card, Badge,
+Divider, PageContainer/PageHeader/Section, Input/Select/FilterBar, Sheet и
+LoadingState/Skeleton/EmptyState/ErrorState. Есть native props/ref, button default
+не submit, настоящие ссылки, labels, hint/error associations, aria-invalid,
+optional presentation actions. ErrorState не принимает Error/stack trace;
+передавать в description можно только безопасный текст. Нет forms domain logic.
+Sheet — локальный responsive компонент на Radix Dialog, с portal, scroll lock,
+focus trap, Escape, доступными title/description и возвратом фокуса.
+
+`app` владеет Query provider, брендом, navigation config и AppShell. QueryClient
+создаётся отдельно на mount, запросы не выполняются. React Router/Outlet задаёт
+общий layout; routes и placeholder titles соответствуют Discovery. `/transactions/import`
+не содержит wizard; текущим родителем остаются транзакции. «Ещё» открывает четыре
+вторичных раздела, при выборе focus переходит в новый main; при отмене возвращается
+на trigger. Есть skip link, document.title и сброс scroll при смене pathname.
+
+`pages` компонуют честный обзор предварительной версии, placeholders и 404.
+Нет фиктивных KPI/графиков/балансов или чтения seed. DEV-only `/design-system`
+показывает работающие примеры primitives/feedback/полей и состояний; production
+не содержит этот route, ссылку и JavaScript витрины. Это developer surface, не
+новый продуктовый раздел. Shared не импортирует pages/app. Пустые features/entities
+и новый monorepo UI package не создавались без реального предметного кода/потребителя.
+Подробные правила, API композиции и ограничения описаны в `apps/web/README.md`.
+
+### Responsive, accessibility и визуальная проверка
+
+Единые breakpoints: 48/64/90rem. Tablet sidebar 224px с переносом длинных названий,
+desktop 248px; максимальный content 1200px, gutters 16/32/40px. Mobile имеет свой
+верхний бренд и четыре bottom navigation items. Bottom navigation sticky, остаётся
+в потоке и резервирует фактическую высоту, включая выросшие labels/safe area.
+Sheet снизу на mobile и справа на tablet/desktop, ограничен dvh, body прокручивается.
+Touch targets от 44px, видимые hover/active/focus/disabled, цвет дублируется текстом
+и активным маркером. Scroll padding сохраняет видимость клавиатурного фокуса.
+
+Использован навык Browser и встроенный браузер Codex: фактически открыты и визуально
+просмотрены desktop 1440×960, tablet 768×1024, mobile 390×844, мобильная панель «Ещё»,
+витрина состояний и production preview. Проверены spacing, типографика, выравнивание,
+переносы, active state, navigation и scroll. Browser screenshot сразу после scroll
+один раз захватил ещё не перерисованный кадр; свежий screenshot показал реальные
+состояния, DOM/геометрия подтверждали содержимое. Это не объявлялось дефектом UI.
+
+Playwright дополнительно проверяет 320×740, 390×844, 640×320, 767×900,
+768×1024, 1024×768, 1440×960 и 1920×1080. На каждом размере проверены обзор,
+длинное название регулярных операций, CSV deep link и витрина. Проверяются
+horizontal overflow, отсутствие обрезки навигации, touch target geometry,
+нижний footer и keyboard focus. Отдельно проверен root font 200% с очень длинным
+денежным примером/вводом, reduced motion и native Select.
+
+Axe WCAG 2/2.1/2.2 A/AA: ноль violations на обзоре, placeholder, витрине и открытом
+dialog в 390px и 1440px. Дополнительно реальные keyboard проверки: Tab/Shift+Tab,
+Enter, skip link, visible focus, trap, Escape, возврат trigger, focus после route
+change и browser back. Это проверенная accessibility foundation, не заявление
+о сертификации: физические iOS/Android и screen reader (VoiceOver/NVDA) отдельно
+не тестировались; финансовые графики/формы ещё отсутствуют.
+
+### Найденные проблемы и исправления
+
+- Первый build выявил коллизию `navigation.ts`/`Navigation.tsx` при resolution на
+  case-insensitive macOS. Конфигурация переименована в `navigation-config.ts`.
+- Первый dev listen получил sandbox EPERM; тот же Vite запущен с разрешением
+  loopback listen. Настройки приложения/безопасности не ослаблялись. Вкладка с
+  прежней ошибкой соединения заменена новой после подтверждения HTTP 200.
+- Lint обнаружил неявный any callback тестовой формы: задан тип React SubmitEvent,
+  отключений правила/strict не добавлялось.
+- Начальный фиксированный расчёт нижнего padding не учитывал полную высоту nav.
+  После browser geometry проверки bottom navigation переведена в sticky flow.
+  Остаточная разница 0.375px в footer test — дробное округление scroll position;
+  допуск 1 CSS px документирован в тесте, видимость самих действий проверяется
+  отдельно без допуска перекрытия.
+- При 200% шрифта верхний бренд с badge не переносились, а мобильные labels
+  наезжали друг на друга. Добавлены flex-wrap и переносы длинного текста, nav
+  имеет естественную высоту; тест воспроизводит именно увеличенный шрифт.
+- Axe поймал недостаточный contrast во время fade-in текста панели. У Sheet
+  удалена анимация opacity; остаётся короткое перемещение полностью непрозрачной
+  поверхности. Контраст стабилен во время открытия, тест не прячет проблему
+  искусственной задержкой или отключением правила.
+- При отдельном self-review добавлен scroll padding для видимости keyboard focus
+  над bottom navigation, а также браузерная регрессия этого сценария.
+- Убраны неиспользуемые hintId/errorId и имя незагружаемого Inter из font stack.
+  Проверены размеры компонентов, отсутствие domain imports, magic colors вне
+  tokens (только статический brand favicon/meta), ненужных API и зависимостей.
+
+### Зависимости и footprint
+
+Новые runtime packages: react-router 8.3.1, @tanstack/react-query 5.102.8,
+@radix-ui/react-dialog 1.1.23, @radix-ui/react-slot 1.3.3, lucide-react 1.41.0.
+Dev: tailwindcss/@tailwindcss/vite 4.3.3, @testing-library/user-event 14.6.7,
+@playwright/test 1.63.0, @axe-core/playwright 4.13.0. Они реально используются.
+Прежние direct dependencies/engines не обновлены; pnpm-workspace policies неизменны.
+Установка Lucide пережила один DNS retry, завершилась успешно. Проверка peer
+совместимости не потребовала исключений. Frozen install успешен, lockfile стабилен.
+Production JS около 334.32 kB (105.79 kB gzip), CSS 33.23 kB (6.13 kB gzip).
+Lucide tree-shaken, dev-витрина исключена. Remote font/API/CDN для UI не нужны.
+
+### Выполненные проверки
+
+| Проверка                         | Результат                                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile` | Успех; lockfile актуален, версии закреплены                                                                                                       |
+| `pnpm lint`                      | Успех, zero warnings, без suppressions                                                                                                            |
+| `pnpm format:check`              | Успех; canonical sources исключены из форматирования                                                                                              |
+| `pnpm typecheck`                 | Успех Web, API и api-client; strict и skipLibCheck:false сохранены                                                                                |
+| `pnpm test`                      | Успех: 19 frontend tests, Nest HTTP smoke и 13 PostgreSQL scenarios; node:test также считает родительский test, итого сообщает 15                 |
+| `pnpm test:e2e`                  | Успех: responsive, keyboard, focus, states/fields, axe, reduced motion и reflow                                                                   |
+| `pnpm build`                     | Production Web и Nest API собраны                                                                                                                 |
+| `pnpm db:validate`               | Prisma schema валидна                                                                                                                             |
+| `pnpm api:check`                 | OpenAPI export и Orval generation воспроизводимы, generated файлы не изменены                                                                     |
+| `pnpm test:docker`               | Полная штатная clean-source приёмка успешна: оба образа, 3 healthy services, HTTP/deep links/Swagger, seed ×3, outage/recovery, down/up и cleanup |
+| Browser verification             | Реальный dev UI, desktop/tablet/mobile, Sheet, states; production `/design-system` показывает 404 и не имеет ссылки на витрину                    |
+
+Полная Docker приёмка сохранила hash dataset Stage 2:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Тесты работают на отдельной настоящей PostgreSQL; demo-БД не очищается.
+CI сохранён и расширен установкой Chromium/Playwright UI smoke в foundation job;
+Docker acceptance job, инфраструктурные scripts и API contracts не менялись.
+Remote GitHub Actions не запускался: commit/push запрещены пользователем.
+
+### Scope и ограничения
+
+Stage 3 завершён локально. Не реализованы Stage 4+, auth/guards, предметный CRUD,
+бюджеты/аналитика, scheduler, CSV workflow и audit UI. Backend, Prisma schema,
+migrations, seed, Dockerfiles/Compose/Nginx и generated client не редактировались.
+PROJECT.md, DISCOVERY.md, AI_RULES.md сохраняются побайтно. Изменены только frontend,
+его зависимости/проверки и документация фактического состояния. No-op будущие
+кнопки/фиктивные финансовые данные отсутствуют. Light завершена, dark отложен
+согласно каноническому Stage 3; отдельного UI settings functionality нет.
+
+Источники сверки:
+[React Router declarative](https://reactrouter.com/start/declarative/installation),
+[Tailwind Vite](https://tailwindcss.com/docs/installation/using-vite),
+[Radix Dialog](https://www.radix-ui.com/primitives/docs/components/dialog),
+[официальный npm registry](https://registry.npmjs.org/).
+
+Предлагаемый commit: `feat(ui): создать дизайн-систему и адаптивную оболочку Finora`.
+Commit/push и операции с Git history не выполнялись.
+
+Финальная проверка после self-review: 15 Playwright tests passed (8.1s), lint,
+format:check, typecheck и build снова exit 0. Дополнительно выполнен Docker web
+build с окончательным CSS — exit 0. Source integrity подтверждает побайтную
+неизменность трёх canonical sources, прежних dependency versions, backend,
+инфраструктуры и generated contracts. Git diff/check просмотрены: 16 изменённых
+и 24 новых файла; build/test artifacts игнорируются. Временный PostgreSQL project
+остановлен и удалён вместе со своим volume; dev/preview процессы остановлены.
+Ограничение осталось только для remote CI и не проведённых проверок на физических
+устройствах/screen reader; обязательные локальные проверки Stage 3 пройдены.

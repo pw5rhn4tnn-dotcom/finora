@@ -11,6 +11,8 @@ export default defineConfig(
     '**/dist/**',
     '**/dist-test/**',
     '**/coverage/**',
+    '**/playwright-report/**',
+    '**/test-results/**',
     'apps/api/src/generated/**',
     'packages/api-client/src/generated.ts',
   ]),

@@ -1,0 +1,179 @@
+@layer components {
+  .app-shell {
+    @apply flex min-h-dvh flex-col;
+  }
+  .shell-body {
+    @apply flex min-w-0 flex-1 flex-col;
+    min-height: calc(100dvh - var(--bottom-nav-height));
+  }
+  .shell-body main {
+    @apply min-w-0 flex-1;
+  }
+  .skip-link {
+    @apply fixed left-4 top-4 rounded-md bg-primary px-4 py-3 text-label text-on-primary;
+    z-index: var(--z-skip-link);
+    transform: translateY(-200%);
+  }
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+  .brand {
+    @apply inline-flex w-fit items-center gap-3 rounded-sm text-section font-semibold tracking-tight;
+  }
+  .brand__mark {
+    @apply flex size-9 items-center justify-center rounded-md bg-primary text-on-primary;
+  }
+  .brand__mark svg {
+    @apply size-6;
+  }
+  .sidebar {
+    @apply hidden;
+  }
+  .topbar {
+    @apply flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4;
+  }
+  .topbar__desktop-label {
+    @apply hidden text-secondary text-text-secondary;
+  }
+  .topbar > .badge {
+    @apply max-w-40 text-center;
+  }
+  .shell-footer {
+    @apply mx-auto flex w-full flex-wrap items-center justify-between gap-3 px-4 pb-6 pt-4 text-caption text-text-muted;
+    max-width: var(--content-width);
+  }
+  .shell-footer a {
+    @apply inline-flex min-h-11 items-center text-primary underline underline-offset-4;
+  }
+  .nav-link {
+    @apply flex min-h-12 min-w-0 items-center gap-3 rounded-md px-3 py-3 text-secondary font-medium text-text-secondary;
+    transition:
+      color var(--duration-fast),
+      background-color var(--duration-fast);
+  }
+  .nav-link svg {
+    @apply size-5;
+  }
+  .nav-link span {
+    @apply min-w-0;
+    overflow-wrap: anywhere;
+  }
+  .nav-link:hover {
+    @apply bg-surface-secondary text-foreground;
+  }
+  .nav-link:active {
+    @apply bg-muted;
+  }
+  .nav-link.active {
+    @apply bg-primary-soft text-primary;
+    box-shadow: inset calc(var(--spacing) * 0.75) 0 0 var(--color-primary);
+  }
+  .bottom-navigation {
+    @apply sticky bottom-0 shrink-0 border-t border-border bg-surface px-2;
+    z-index: var(--z-navigation);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-navigation > ul {
+    @apply m-0 grid list-none grid-cols-4 gap-1 p-0;
+    min-height: var(--bottom-nav-height);
+  }
+  .bottom-navigation li {
+    @apply flex min-w-0;
+  }
+  .bottom-link {
+    @apply my-2 flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0 py-2 text-caption font-medium text-text-secondary;
+    transition:
+      background-color var(--duration-fast),
+      color var(--duration-fast);
+    min-height: var(--control-height);
+  }
+  .bottom-link span {
+    width: 100%;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .bottom-link svg {
+    @apply size-5;
+  }
+  .bottom-link:hover {
+    @apply bg-surface-secondary;
+  }
+  .bottom-link:active {
+    @apply bg-muted;
+  }
+  .bottom-link.active {
+    @apply bg-primary-soft text-primary;
+  }
+  .bottom-link.active span {
+    @apply font-semibold;
+    text-decoration: underline;
+    text-underline-offset: var(--spacing);
+  }
+  .more-navigation {
+    @apply m-0 flex list-none flex-col gap-2 p-0;
+  }
+}
+
+@media (width >= theme(--breakpoint-tablet)) {
+  .sidebar {
+    @apply fixed inset-y-0 left-0 flex flex-col gap-10 overflow-y-auto border-r border-border bg-surface px-4 py-7;
+    width: var(--sidebar-width);
+  }
+  .sidebar > .brand {
+    @apply ml-3;
+  }
+  .sidebar__navigation {
+    @apply flex flex-1 flex-col;
+  }
+  .sidebar__navigation ul {
+    @apply m-0 flex list-none flex-col gap-1 p-0;
+  }
+  .nav-caption {
+    @apply mb-3 px-3 text-caption font-medium text-text-muted;
+  }
+  .nav-caption--group {
+    @apply mt-8;
+  }
+  .sidebar__settings {
+    @apply mt-8;
+  }
+  .sidebar__note {
+    @apply mx-3 flex items-start gap-3 border-t border-border pt-6 text-caption text-text-muted;
+  }
+  .sidebar__note-mark {
+    @apply mt-1 h-6 w-1 shrink-0 rounded-sm bg-primary;
+  }
+  .shell-body {
+    margin-left: var(--sidebar-width);
+    min-height: 100dvh;
+    padding-bottom: 0;
+  }
+  .bottom-navigation,
+  .topbar__mobile-brand {
+    @apply hidden;
+  }
+  .topbar {
+    @apply px-8;
+  }
+  .topbar > .badge {
+    max-width: none;
+  }
+  .topbar__desktop-label {
+    @apply block;
+  }
+  .shell-footer {
+    @apply px-8;
+  }
+}
+@media (width >= theme(--breakpoint-desktop)) {
+  .sidebar {
+    width: var(--sidebar-wide-width);
+  }
+  .shell-body {
+    margin-left: var(--sidebar-wide-width);
+  }
+  .topbar,
+  .shell-footer {
+    @apply px-10;
+  }
+}

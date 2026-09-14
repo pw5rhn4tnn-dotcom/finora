@@ -2,8 +2,10 @@
 
 Finora — приложение для управления личными финансами по [DISCOVERY.md](DISCOVERY.md).
 Stage 1 foundation сохранён; Stage 2 добавляет PostgreSQL/Prisma, миграции, богатый
-seed и Docker runtime. **Stage 2 локально завершён**, проверки записаны в REPORT. Сейчас UI показывает «Приложение в разработке», API содержит
-только инфраструктурные endpoints. Авторизации, финансового CRUD и dashboard ещё нет.
+seed и Docker runtime. **Stage 3 — Design System & App Shell локально завершён**: светлая тема,
+reusable primitives, responsive sidebar/bottom navigation и явно обозначенные
+предварительные экраны. API содержит только инфраструктурные endpoints.
+Авторизации, финансового CRUD и dashboard ещё нет. Проверки записаны в REPORT.
 
 ## Запуск с чистого checkout
 
@@ -18,7 +20,7 @@ docker compose up
 При первом запуске Compose сам собирает отсутствующие Web/API images. Дождитесь
 готовности API и Web. Адреса по умолчанию:
 
-- [Web](http://localhost:8080) — минимальный UI Stage 1;
+- [Web](http://localhost:8080) — адаптивная оболочка Stage 3;
 - [Swagger UI](http://localhost:8080/docs);
 - [OpenAPI JSON](http://localhost:8080/docs/openapi.json);
 - [Liveness](http://localhost:8080/health/live);
@@ -130,23 +132,26 @@ pnpm lint
 pnpm format:check
 pnpm typecheck
 pnpm test
+pnpm --filter @finora/web exec playwright install chromium
+pnpm test:e2e
 pnpm build
 pnpm db:validate
 pnpm api:check
 pnpm test:docker
 ```
 
-| Команда             | Назначение                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `pnpm db:generate`  | Сгенерировать Prisma client из schema                                                  |
-| `pnpm db:validate`  | Проверить Prisma schema                                                                |
-| `pnpm db:migrate`   | Применить сохранённые migrations через migrate deploy                                  |
-| `pnpm db:seed`      | Собрать и выполнить идемпотентный seed                                                 |
-| `pnpm db:setup`     | Migrate → runtime permissions → seed для local dev                                     |
-| `pnpm api:generate` | Экспортировать реальный Swagger-контракт и пересоздать Orval client                    |
-| `pnpm api:check`    | Проверить отсутствие изменений после повторной генерации                               |
-| `pnpm test:docker`  | Clean-source Compose builds, migrations/seed, HTTP, outage/recovery, restart и cleanup |
-| `pnpm format`       | Отформатировать изменяемые исходники/документы                                         |
+| Команда             | Назначение                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm db:generate`  | Сгенерировать Prisma client из schema                                                    |
+| `pnpm db:validate`  | Проверить Prisma schema                                                                  |
+| `pnpm db:migrate`   | Применить сохранённые migrations через migrate deploy                                    |
+| `pnpm db:seed`      | Собрать и выполнить идемпотентный seed                                                   |
+| `pnpm db:setup`     | Migrate → runtime permissions → seed для local dev                                       |
+| `pnpm api:generate` | Экспортировать реальный Swagger-контракт и пересоздать Orval client                      |
+| `pnpm api:check`    | Проверить отсутствие изменений после повторной генерации                                 |
+| `pnpm test:e2e`     | Playwright: responsive shell, keyboard/focus, reflow, reduced motion и axe accessibility |
+| `pnpm test:docker`  | Clean-source Compose builds, migrations/seed, HTTP, outage/recovery, restart и cleanup   |
+| `pnpm format`       | Отформатировать изменяемые исходники/документы                                           |
 
 `pnpm test` сохраняет Stage 1 frontend/Nest smoke и запускает real PostgreSQL
 integration. Тесты сами создают отдельные `finora_test_*` databases, применяют baseline
@@ -169,10 +174,17 @@ PROJECT/DISCOVERY/AI_RULES исключены из автоматическог�
 
 GitHub Actions имеет два jobs. Первый использует PostgreSQL service и выполняет
 frozen install, schema validation, lint, format, strict typecheck, smoke/integration,
-build и проверку OpenAPI generation. Второй выполняет clean/repeated Docker acceptance,
+build, Playwright/axe UI smoke и проверку OpenAPI generation. Второй выполняет clean/repeated Docker acceptance,
 включая build обоих images. Тестовые данные воспроизводимы, developer machine не нужна.
 
 **Remote GitHub Actions: pending verification after commit/push.**
+
+## UI foundation
+
+Tokens, composition, breakpoints и доступность описаны в [apps/web/README.md](apps/web/README.md).
+При `pnpm dev:web` ссылка «Компоненты интерфейса» открывает dev-only витрину
+`/design-system`; в production витрина не доступна. Формы в витрине не отправляют
+данные. Stage 3 не подключает financial seed к UI.
 
 ## Документация
 

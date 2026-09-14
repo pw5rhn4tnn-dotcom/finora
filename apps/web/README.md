@@ -1,0 +1,129 @@
+# Frontend foundation Finora · Stage 3
+
+Работающая адаптивная оболочка, общие UI primitives и светлая тема.
+Авторизация и предметные функции ещё не реализованы. Разделы явно обозначены
+как предварительный просмотр. Главный экран не использует seed и не показывает
+вымышленные финансовые показатели.
+
+## Структура и границы
+
+- `src/app`: Query provider, shell, branding и единая конфигурация navigation.
+- `src/App.tsx`: React Router routes и общий `AppShell` с `Outlet`.
+- `src/pages`: композиция обзорного экрана, placeholders, 404 и dev-витрина.
+- `src/shared/ui`: Button/ButtonLink/IconButton, Card/Badge/Divider,
+  PageContainer/PageHeader/Section, Input/Select/FilterBar, Sheet,
+  EmptyState/ErrorState/LoadingState/Skeleton.
+- `src/shared/styles`: tokens, базовый слой и общие component styles.
+- `e2e`: настоящие браузерные проверки shell, responsive и accessibility.
+
+Shared не импортирует app/pages/domain. UI остаётся внутри web: второго потребителя
+для нового workspace UI package пока нет. `features` и `entities` появятся вместе
+с реальными функциями; пустые каталоги и domain-заглушки не создаются.
+QueryClient создаётся в AppProviders отдельно для каждого mount, без глобального
+singleton. Query provider пока не выполняет запросы.
+
+## Tokens и тема
+
+Единственный источник — `src/shared/styles/tokens.css`. Tailwind 4 `@theme static`
+экспортирует CSS custom properties и semantic utilities, CSS компонентов использует
+эти же значения. `data-theme="light"` задан на html до первого paint;
+`color-scheme: light` согласует native controls. Нет localStorage, переключателя,
+внешнего theme-provider и автоматического перехода в незавершённый dark mode.
+
+| Система   | Решение                                                                                                                                                              |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Палитра   | background/surface/surface-secondary, foreground/text-secondary/text-muted, border/input-border, primary/hover/active/soft/on-primary, focus, disabled/text-disabled |
+| Семантика | success/income — зелёный, danger/expense — красный, warning — янтарный; каждый статус дополнен текстом                                                               |
+| Шрифт     | системный sans-serif с кириллицей; без внешней загрузки и font layout shift                                                                                          |
+| Иерархия  | display 36/43.2, title 28/35, section 20/28, card/body 16/24–25.6, secondary/label 14/21–19.6, caption 12/18 px при стандартном root 16px                            |
+| Деньги    | financial 32/40, `numeric`: tabular-nums + lining-nums + перенос длинного значения; никакой финансовой арифметики                                                    |
+| Отступы   | базовый `--spacing: 0.25rem` (4px); 4/8/12/16/20/24/32/40/48 px и кратные значения                                                                                   |
+| Radius    | 6/8/12 px                                                                                                                                                            |
+| Elevation | только sm для surfaces и md для Sheet                                                                                                                                |
+| Borders   | 1px; focus 2px с offset 3px; input-border отличается от декоративного divider и имеет достаточный contrast                                                           |
+| Motion    | tokens 150/200/250ms; загрузочный pulse 1500ms; reduced-motion отключает все transition/animation                                                                    |
+
+Финансовый пример в dev-витрине имеет русское представление `12 450,00 ₽` и явно
+подписан как пример. Реального money formatter/API conversion ещё нет: decimal
+contracts и доменные правила будут подключены на соответствующих этапах.
+Иконки Lucide импортируются по именам, tree shaking исключает неиспользованные.
+Только статический favicon/meta theme-color повторяет brand hex за пределами CSS.
+
+## Responsive
+
+Breakpoints централизованы в `@theme`: tablet 48rem (768px), desktop 64rem
+(1024px), wide 90rem (1440px). Используйте semantic variants `tablet:`, `desktop:`
+или `@media (width >= theme(--breakpoint-tablet))`, без новых случайных порогов.
+
+До 768px — верхний бренд и bottom navigation «Обзор / Транзакции / Бюджеты / Ещё».
+Bottom navigation использует `position: sticky; bottom: 0` и участвует в потоке:
+высота текста и safe-area не требуют JS-измерений или фиксированного padding
+контента. Панель «Ещё» показывает четыре вторичных раздела.
+От 768px — sidebar 224px, от 1024px — 248px; длинные названия переносятся.
+Content ограничен 1200px, отступы растут с 16px до 32/40px. Sheet на mobile
+открывается снизу, на tablet/desktop — справа. Высота ограничена `dvh`, body
+панели прокручивается независимо; учитывается `safe-area-inset-bottom`.
+
+Основные маршруты соответствуют Discovery. `/transactions/import` — только
+placeholder deep link; транзакции остаются активным родительским пунктом.
+Неизвестный адрес получает честный экран 404 со ссылкой к обзору. Нет login,
+register, guards или API-запросов к будущим разделам.
+
+## Использование primitives
+
+```tsx
+<Card>
+  <EmptyState
+    title="Пока ничего нет"
+    description="Содержимое появится после первого действия."
+    action={<Button onClick={onAction}>Продолжить</Button>}
+  />
+</Card>
+<Input label="Название" hint="Подсказка" error={error} />
+<ButtonLink variant="secondary"><Link to="/">К обзору</Link></ButtonLink>
+<Sheet>
+  <SheetTrigger asChild><Button>Открыть</Button></SheetTrigger>
+  <SheetContent title="Панель" description="Назначение панели.">
+    <Input label="Название" />
+  </SheetContent>
+</Sheet>
+```
+
+Button по умолчанию `type="button"`; для form submit укажите type явно.
+ButtonLink сохраняет семантику дочерней ссылки, не имеет фиктивного disabled.
+IconButton требует label, декоративной иконке задайте `aria-hidden`.
+Нативные props/ref доступны через React 19. Input/Select связывают label,
+hint/error и внешний aria-describedby, error выставляет aria-invalid.
+ErrorState принимает только безопасные пользовательские тексты, не exception.
+LoadingState объявляет статус один раз, skeletons скрыты от screen reader.
+
+Sheet использует точечный Radix Dialog: portal, modal semantics, title/description,
+focus trap, Escape, scroll lock и возврат focus. При переходе по ссылке из «Ещё»
+focus идёт в новый main, при обычном закрытии — к trigger. Route transition
+меняет document.title, переводит focus в main и сбрасывает scroll. Есть skip link,
+видимый focus и touch targets от 44px. Цвет не служит единственным признаком active.
+
+## Витрина и проверки
+
+После `pnpm dev:web` доступна dev-only `/design-system`: кнопки/disabled, feedback,
+каркас формы/фильтров, типографика/статусы, Sheet и loading/empty/error.
+В production отсутствуют этот route, ссылка и JavaScript витрины; это не новый
+продуктовый раздел. Проверяется сборкой и просмотром production preview.
+
+Из корня monorepo:
+
+```bash
+pnpm --filter @finora/web test
+pnpm --filter @finora/web exec playwright install chromium
+pnpm test:e2e
+```
+
+В Linux CI установка браузера использует `--with-deps`. Playwright сам поднимает
+Vite на свободном фиксированном порту 4173; существующий сервер не переиспользуется.
+Trace/screenshots сохраняются при ошибке и игнорируются Git/lint/format.
+Vitest/Testing Library проверяют поведение компонентов; jsdom не используется
+как доказательство layout. Playwright проверяет 320/390/640/767/768/1024/1440/1920px,
+landscape, keyboard/focus, размеры и видимость навигации, длинный текст, 200% шрифт,
+reduced motion и axe WCAG 2.2 AA для страниц и открытого dialog.
+Это accessibility foundation, а не сертификат полного приложения; реальные
+screen reader/iOS/Android проверки и domain-specific accessibility ещё впереди.

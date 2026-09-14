@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1 и database/infrastructure foundation Stage 2. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Предметные функции и UI Stage 3+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–2 и frontend foundation Stage 3. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Предметные функции Stage 4+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -123,6 +123,34 @@ TanStack Query хранит серверное состояние. Ключи з
 Адаптивность предусматривает sidebar на desktop, нижнюю навигацию `Обзор / Транзакции / Бюджеты / Ещё` на mobile, карточки вместо таблицы транзакций, отдельный filter sheet и подходящий экрану диалог редактирования. Данные и правила общие для обеих форм представления.
 
 Практический ориентир — WCAG 2.2 AA: semantic HTML, labels, клавиатура, видимый focus, focus trap/возврат focus, Escape, контраст и удобные touch targets. Цвет дублируется текстом/иконкой; графики имеют текстовое резюме. Каждый сценарий получает loading, empty, filtered empty, error/retry, success и подтверждение разрушительного действия. Все пользовательские тексты русские, форматирование `ru-RU`.
+
+### Реализованный frontend foundation Stage 3
+
+CSS tokens находятся в `apps/web/src/shared/styles/tokens.css` и используются
+Tailwind 4 через `@theme static`; тема light задаётся на html до React mount.
+Semantic palette, typography, spacing, radius, elevations и durations не
+дублируются по компонентам. Breakpoints tablet/desktop/wide — 48/64/90rem.
+Shared UI находится в web, отдельный workspace UI package без второго потребителя
+не создаётся. Локальные primitives используют подход shadcn и точечные Radix
+Dialog/Slot, без установки большой библиотеки или CLI.
+
+`app` содержит providers/shell/navigation; QueryClient принадлежит mount
+AppProviders, не выполняет запросы и не является глобальным singleton. React
+Router оборачивает routes общим AppShell/Outlet. `pages` содержит presentation
+overview, честные placeholders и 404. `features`/`entities` пока не создаются:
+нет предметного кода, которым эти каталоги должны владеть.
+
+Desktop/tablet sidebar имеет ширину 248/224px. Mobile bottom navigation sticky
+и участвует в потоке, поэтому footer учитывает её фактическую высоту даже при
+увеличении шрифта. «Ещё» использует общий responsive Radix Sheet. Route changes
+обновляют title и focus/scroll; dialog управляет trap/возвратом focus и Escape.
+Loading/empty/error, labelled native fields и filter fieldset — presentation
+primitives. Dev-only `/design-system` не входит в product navigation/production
+JavaScript. Подробности и примеры: [frontend README](apps/web/README.md).
+
+Vitest/Testing Library/user-event проверяют компоненты; Playwright/axe дополняют
+CI проверками responsive, keyboard, reflow и reduced motion. Наличие foundation
+не означает готовности auth, форм транзакций, аналитики или WCAG-сертификации.
 
 ## 7. Backend
 

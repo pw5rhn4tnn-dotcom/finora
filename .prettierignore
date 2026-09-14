@@ -10,3 +10,6 @@ AI_RULES.md
 apps/api/src/generated/
 packages/api-client/src/generated.ts
 packages/api-client/openapi/finora.json
+
+playwright-report/
+test-results/
