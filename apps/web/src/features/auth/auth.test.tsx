@@ -304,3 +304,38 @@ test('pending профиля блокирует выход, а поздний о
   await waitFor(() => expect(client.isMutating()).toBe(0));
   expect(client.getQueryData(sessionKey)).toEqual(other);
 });
+
+test('гостевая сессия не отменяет загрузку публичных валют при прямом открытии регистрации', async () => {
+  let releaseSession!: (response: Response) => void;
+  let releaseOptions!: (response: Response) => void;
+  const session = new Promise<Response>((resolve) => {
+    releaseSession = resolve;
+  });
+  const options = new Promise<Response>((resolve) => {
+    releaseOptions = resolve;
+  });
+  let optionsSignal: AbortSignal | null | undefined;
+  respond((url, init) => {
+    if (url.endsWith('/auth/me')) return session;
+    if (url.endsWith('/settings/options')) {
+      optionsSignal = init?.signal;
+      return options;
+    }
+    return problem(500, 'Неожиданный запрос');
+  });
+  mount('/register');
+  releaseSession(problem(401, 'Войдите в аккаунт'));
+  await screen.findByText('Загружаем валюты и часовые пояса…');
+  await waitFor(() =>
+    expect(
+      screen.getByRole('heading', { name: 'Создать аккаунт' }),
+    ).not.toBeNull(),
+  );
+  releaseOptions(Response.json(testOptions));
+  await waitFor(() =>
+    expect(
+      screen.getByLabelText<HTMLSelectElement>('Основная валюта').disabled,
+    ).toBe(false),
+  );
+  expect(optionsSignal?.aborted).toBe(false);
+});

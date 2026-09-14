@@ -15,7 +15,8 @@ await test('запускает Nest HTTP server с Prisma, Swagger и инфра
     assert.ok(app.get(AppModule) instanceof AppModule);
     const url = await app.getUrl();
     assert.equal((await fetch(url)).status, 404);
-    assert.equal((await fetch(`${url}/api/v1/transactions`)).status, 404);
+    assert.equal((await fetch(`${url}/api/v1/unknown`)).status, 404);
+    assert.equal((await fetch(`${url}/api/v1/transactions`)).status, 401);
     assert.equal((await fetch(`${url}/health/live`)).status, 200);
     assert.equal((await fetch(`${url}/health/ready`)).status, 200);
     assert.equal((await fetch(`${url}/docs`)).status, 200);

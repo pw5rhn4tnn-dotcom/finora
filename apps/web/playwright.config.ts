@@ -3,8 +3,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   ...(process.env.FINORA_COMPOSE_URL
-    ? { testMatch: '**/auth.compose.spec.ts' }
-    : { testIgnore: '**/auth.compose.spec.ts' }),
+    ? { testMatch: '**/*.compose.spec.ts' }
+    : { testIgnore: '**/*.compose.spec.ts' }),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.FINORA_COMPOSE_URL ? 0 : process.env.CI ? 1 : 0,

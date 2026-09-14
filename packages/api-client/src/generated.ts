@@ -110,6 +110,471 @@ export interface ProfileInputDto {
   timeZone: string;
 }
 
+/**
+ * Тип категории
+ */
+export type CategoryDtoType = typeof CategoryDtoType[keyof typeof CategoryDtoType];
+
+
+export const CategoryDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Иконка категории
+ */
+export type CategoryDtoIcon = typeof CategoryDtoIcon[keyof typeof CategoryDtoIcon];
+
+
+export const CategoryDtoIcon = {
+  'briefcase-business': 'briefcase-business',
+  laptop: 'laptop',
+  'shopping-basket': 'shopping-basket',
+  house: 'house',
+  'tram-front': 'tram-front',
+  utensils: 'utensils',
+  'train-front': 'train-front',
+  repeat: 'repeat',
+  heart: 'heart',
+  gift: 'gift',
+  'graduation-cap': 'graduation-cap',
+  wallet: 'wallet',
+} as const;
+
+export interface CategoryDto {
+  /**
+     * Название категории; trim, уникально без регистра в пределах владельца и типа
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  /** Тип категории */
+  type: CategoryDtoType;
+  /** Иконка категории */
+  icon: CategoryDtoIcon;
+  /**
+     * Цвет категории
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+  color: string;
+  /** Идентификатор категории */
+  id: string;
+  /**
+     * Дата архивирования
+     * @nullable
+     */
+  archivedAt: string | null;
+  /** Создана */
+  createdAt: string;
+  /** Изменена */
+  updatedAt: string;
+}
+
+export interface CategoryPageDto {
+  /** Номер страницы */
+  page: number;
+  /** Размер страницы */
+  pageSize: number;
+  /** Всего собственных записей после фильтрации */
+  total: number;
+  /** Категории страницы */
+  items: CategoryDto[];
+}
+
+/**
+ * Тип категории
+ */
+export type CategoryInputDtoType = typeof CategoryInputDtoType[keyof typeof CategoryInputDtoType];
+
+
+export const CategoryInputDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Иконка категории
+ */
+export type CategoryInputDtoIcon = typeof CategoryInputDtoIcon[keyof typeof CategoryInputDtoIcon];
+
+
+export const CategoryInputDtoIcon = {
+  'briefcase-business': 'briefcase-business',
+  laptop: 'laptop',
+  'shopping-basket': 'shopping-basket',
+  house: 'house',
+  'tram-front': 'tram-front',
+  utensils: 'utensils',
+  'train-front': 'train-front',
+  repeat: 'repeat',
+  heart: 'heart',
+  gift: 'gift',
+  'graduation-cap': 'graduation-cap',
+  wallet: 'wallet',
+} as const;
+
+export interface CategoryInputDto {
+  /**
+     * Название категории; trim, уникально без регистра в пределах владельца и типа
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  /** Тип категории */
+  type: CategoryInputDtoType;
+  /** Иконка категории */
+  icon: CategoryInputDtoIcon;
+  /**
+     * Цвет категории
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+  color: string;
+}
+
+/**
+ * Тип категории
+ */
+export type CategoryPatchDtoType = typeof CategoryPatchDtoType[keyof typeof CategoryPatchDtoType];
+
+
+export const CategoryPatchDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Иконка категории
+ */
+export type CategoryPatchDtoIcon = typeof CategoryPatchDtoIcon[keyof typeof CategoryPatchDtoIcon];
+
+
+export const CategoryPatchDtoIcon = {
+  'briefcase-business': 'briefcase-business',
+  laptop: 'laptop',
+  'shopping-basket': 'shopping-basket',
+  house: 'house',
+  'tram-front': 'tram-front',
+  utensils: 'utensils',
+  'train-front': 'train-front',
+  repeat: 'repeat',
+  heart: 'heart',
+  gift: 'gift',
+  'graduation-cap': 'graduation-cap',
+  wallet: 'wallet',
+} as const;
+
+export interface CategoryPatchDto {
+  /**
+     * Название категории; trim, уникально без регистра в пределах владельца и типа
+     * @minLength 1
+     * @maxLength 100
+     */
+  name?: string;
+  /** Тип категории */
+  type?: CategoryPatchDtoType;
+  /** Иконка категории */
+  icon?: CategoryPatchDtoIcon;
+  /**
+     * Цвет категории
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+  color?: string;
+}
+
+/**
+ * Результат: удалена неиспользованная либо архивирована используемая категория; активные связанные правила также архивируются
+ */
+export type CategoryRemovalDtoOutcome = typeof CategoryRemovalDtoOutcome[keyof typeof CategoryRemovalDtoOutcome];
+
+
+export const CategoryRemovalDtoOutcome = {
+  deleted: 'deleted',
+  archived: 'archived',
+} as const;
+
+export interface CategoryRemovalDto {
+  /** Результат: удалена неиспользованная либо архивирована используемая категория; активные связанные правила также архивируются */
+  outcome: CategoryRemovalDtoOutcome;
+}
+
+/**
+ * Тип операции
+ */
+export type TransactionDtoType = typeof TransactionDtoType[keyof typeof TransactionDtoType];
+
+
+export const TransactionDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+/**
+ * Источник операции
+ */
+export type TransactionDtoSource = typeof TransactionDtoSource[keyof typeof TransactionDtoSource];
+
+
+export const TransactionDtoSource = {
+  MANUAL: 'MANUAL',
+  CSV: 'CSV',
+  RECURRING: 'RECURRING',
+} as const;
+
+export interface TransactionDto {
+  /**
+     * Положительная сумма десятичной строкой; точность валюты из ICU, максимум 16 целых и 8 дробных знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount: string;
+  /** Код валюты из /settings/options */
+  currency: string;
+  /**
+     * Сохранённый курс
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate?: string;
+  /** Собственная категория соответствующего типа */
+  categoryId: string;
+  /** Тип операции */
+  type: TransactionDtoType;
+  /** Календарная дата, без сдвига timezone */
+  transactionDate: string;
+  /**
+     * Описание; пробелы по краям удаляются
+     * @minLength 1
+     * @maxLength 500
+     */
+  description: string;
+  /** Идентификатор операции */
+  id: string;
+  /**
+     * Сумма в основной валюте, рассчитанная сервером
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amountInBaseCurrency: string;
+  /** Категория, включая архивную */
+  category: CategoryDto;
+  /** Источник операции */
+  source: TransactionDtoSource;
+  /**
+     * Историческая связь с правилом
+     * @nullable
+     */
+  recurringTransactionId: string | null;
+  /**
+     * Дата исходного повторения
+     * @nullable
+     */
+  recurringOccurrenceDate: string | null;
+  /** Создана */
+  createdAt: string;
+  /** Изменена */
+  updatedAt: string;
+}
+
+export interface TransactionPageDto {
+  /** Номер страницы */
+  page: number;
+  /** Размер страницы */
+  pageSize: number;
+  /** Всего собственных записей после фильтрации */
+  total: number;
+  /** Операции страницы */
+  items: TransactionDto[];
+}
+
+/**
+ * Тип операции
+ */
+export type TransactionInputDtoType = typeof TransactionInputDtoType[keyof typeof TransactionInputDtoType];
+
+
+export const TransactionInputDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export interface TransactionInputDto {
+  /**
+     * Положительная сумма десятичной строкой; точность валюты из ICU, максимум 16 целых и 8 дробных знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount: string;
+  /** Код валюты из /settings/options */
+  currency: string;
+  /**
+     * Положительный курс к основной валюте; обязателен для чужой валюты и при смене валюты. Для основной валюты равен 1
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate?: string;
+  /** Собственная категория соответствующего типа */
+  categoryId: string;
+  /** Тип операции */
+  type: TransactionInputDtoType;
+  /** Календарная дата, без сдвига timezone */
+  transactionDate: string;
+  /**
+     * Описание; пробелы по краям удаляются
+     * @minLength 1
+     * @maxLength 500
+     */
+  description: string;
+}
+
+/**
+ * Тип операции
+ */
+export type TransactionPatchDtoType = typeof TransactionPatchDtoType[keyof typeof TransactionPatchDtoType];
+
+
+export const TransactionPatchDtoType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export interface TransactionPatchDto {
+  /**
+     * Положительная сумма десятичной строкой; точность валюты из ICU, максимум 16 целых и 8 дробных знаков
+     * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+     */
+  amount?: string;
+  /** Код валюты из /settings/options */
+  currency?: string;
+  /**
+     * Положительный курс к основной валюте; обязателен для чужой валюты и при смене валюты. Для основной валюты равен 1
+     * @pattern ^(0|[1-9][0-9]{0,11})(\.[0-9]{1,12})?$
+     */
+  exchangeRate?: string;
+  /** Собственная категория соответствующего типа */
+  categoryId?: string;
+  /** Тип операции */
+  type?: TransactionPatchDtoType;
+  /** Календарная дата, без сдвига timezone */
+  transactionDate?: string;
+  /**
+     * Описание; пробелы по краям удаляются
+     * @minLength 1
+     * @maxLength 500
+     */
+  description?: string;
+}
+
+export type CategoriesListParams = {
+/**
+ * Номер страницы от 1
+ * @minimum 1
+ * @maximum 9999999
+ */
+page?: number;
+/**
+ * Размер страницы
+ */
+pageSize?: CategoriesListPageSize;
+/**
+ * Состояние категорий
+ */
+state?: CategoriesListState;
+};
+
+export type CategoriesListPageSize = typeof CategoriesListPageSize[keyof typeof CategoriesListPageSize];
+
+
+export const CategoriesListPageSize = {
+  NUMBER_10: 10,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
+} as const;
+
+export type CategoriesListState = typeof CategoriesListState[keyof typeof CategoriesListState];
+
+
+export const CategoriesListState = {
+  all: 'all',
+  active: 'active',
+  archived: 'archived',
+} as const;
+
+export type TransactionsListParams = {
+/**
+ * Номер страницы от 1
+ * @minimum 1
+ * @maximum 9999999
+ */
+page?: number;
+/**
+ * Размер страницы
+ */
+pageSize?: TransactionsListPageSize;
+/**
+ * Буквальный поиск без регистра по описанию и категории; пробелы по краям удаляются
+ * @maxLength 200
+ */
+search?: string;
+/**
+ * Тип операции
+ */
+type?: TransactionsListType;
+/**
+ * Категория, включая архивную
+ */
+categoryId?: string;
+/**
+ * Начальная дата включительно
+ */
+dateFrom?: string;
+/**
+ * Конечная дата включительно
+ */
+dateTo?: string;
+/**
+ * Минимум в основной валюте
+ * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+ */
+amountMin?: string;
+/**
+ * Максимум в основной валюте
+ * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+ */
+amountMax?: string;
+/**
+ * Исходная валюта из /settings/options
+ */
+currency?: string;
+/**
+ * Порядок; суммы в основной валюте, стабильный дополнительный порядок по id
+ */
+sort?: TransactionsListSort;
+};
+
+export type TransactionsListPageSize = typeof TransactionsListPageSize[keyof typeof TransactionsListPageSize];
+
+
+export const TransactionsListPageSize = {
+  NUMBER_10: 10,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
+} as const;
+
+export type TransactionsListType = typeof TransactionsListType[keyof typeof TransactionsListType];
+
+
+export const TransactionsListType = {
+  ALL: 'ALL',
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export type TransactionsListSort = typeof TransactionsListSort[keyof typeof TransactionsListSort];
+
+
+export const TransactionsListSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  amountDesc: 'amountDesc',
+  amountAsc: 'amountAsc',
+} as const;
+
 export type healthLiveResponse200 = {
   data: HealthDto
   status: 200
@@ -223,6 +688,11 @@ export type authRegisterResponse403 = {
   status: 403
 }
 
+export type authRegisterResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type authRegisterResponse409 = {
   data: ProblemDto
   status: 409
@@ -246,7 +716,7 @@ export type authRegisterResponse500 = {
 export type authRegisterResponseSuccess = (authRegisterResponse201) & {
   headers: Headers;
 };
-export type authRegisterResponseError = (authRegisterResponse400 | authRegisterResponse401 | authRegisterResponse403 | authRegisterResponse409 | authRegisterResponse413 | authRegisterResponse429 | authRegisterResponse500) & {
+export type authRegisterResponseError = (authRegisterResponse400 | authRegisterResponse401 | authRegisterResponse403 | authRegisterResponse404 | authRegisterResponse409 | authRegisterResponse413 | authRegisterResponse429 | authRegisterResponse500) & {
   headers: Headers;
 };
 
@@ -317,6 +787,11 @@ export type authLoginResponse403 = {
   status: 403
 }
 
+export type authLoginResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type authLoginResponse409 = {
   data: ProblemDto
   status: 409
@@ -340,7 +815,7 @@ export type authLoginResponse500 = {
 export type authLoginResponseSuccess = (authLoginResponse200) & {
   headers: Headers;
 };
-export type authLoginResponseError = (authLoginResponse400 | authLoginResponse401 | authLoginResponse403 | authLoginResponse409 | authLoginResponse413 | authLoginResponse429 | authLoginResponse500) & {
+export type authLoginResponseError = (authLoginResponse400 | authLoginResponse401 | authLoginResponse403 | authLoginResponse404 | authLoginResponse409 | authLoginResponse413 | authLoginResponse429 | authLoginResponse500) & {
   headers: Headers;
 };
 
@@ -411,6 +886,11 @@ export type authLogoutResponse403 = {
   status: 403
 }
 
+export type authLogoutResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type authLogoutResponse409 = {
   data: ProblemDto
   status: 409
@@ -434,7 +914,7 @@ export type authLogoutResponse500 = {
 export type authLogoutResponseSuccess = (authLogoutResponse204) & {
   headers: Headers;
 };
-export type authLogoutResponseError = (authLogoutResponse400 | authLogoutResponse401 | authLogoutResponse403 | authLogoutResponse409 | authLogoutResponse413 | authLogoutResponse429 | authLogoutResponse500) & {
+export type authLogoutResponseError = (authLogoutResponse400 | authLogoutResponse401 | authLogoutResponse403 | authLogoutResponse404 | authLogoutResponse409 | authLogoutResponse413 | authLogoutResponse429 | authLogoutResponse500) & {
   headers: Headers;
 };
 
@@ -491,6 +971,11 @@ export type authMeResponse403 = {
   status: 403
 }
 
+export type authMeResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type authMeResponse409 = {
   data: ProblemDto
   status: 409
@@ -514,7 +999,7 @@ export type authMeResponse500 = {
 export type authMeResponseSuccess = (authMeResponse200) & {
   headers: Headers;
 };
-export type authMeResponseError = (authMeResponse400 | authMeResponse401 | authMeResponse403 | authMeResponse409 | authMeResponse413 | authMeResponse429 | authMeResponse500) & {
+export type authMeResponseError = (authMeResponse400 | authMeResponse401 | authMeResponse403 | authMeResponse404 | authMeResponse409 | authMeResponse413 | authMeResponse429 | authMeResponse500) & {
   headers: Headers;
 };
 
@@ -571,6 +1056,11 @@ export type settingsOptionsResponse403 = {
   status: 403
 }
 
+export type settingsOptionsResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type settingsOptionsResponse409 = {
   data: ProblemDto
   status: 409
@@ -594,7 +1084,7 @@ export type settingsOptionsResponse500 = {
 export type settingsOptionsResponseSuccess = (settingsOptionsResponse200) & {
   headers: Headers;
 };
-export type settingsOptionsResponseError = (settingsOptionsResponse400 | settingsOptionsResponse401 | settingsOptionsResponse403 | settingsOptionsResponse409 | settingsOptionsResponse413 | settingsOptionsResponse429 | settingsOptionsResponse500) & {
+export type settingsOptionsResponseError = (settingsOptionsResponse400 | settingsOptionsResponse401 | settingsOptionsResponse403 | settingsOptionsResponse404 | settingsOptionsResponse409 | settingsOptionsResponse413 | settingsOptionsResponse429 | settingsOptionsResponse500) & {
   headers: Headers;
 };
 
@@ -651,6 +1141,11 @@ export type settingsGetResponse403 = {
   status: 403
 }
 
+export type settingsGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type settingsGetResponse409 = {
   data: ProblemDto
   status: 409
@@ -674,7 +1169,7 @@ export type settingsGetResponse500 = {
 export type settingsGetResponseSuccess = (settingsGetResponse200) & {
   headers: Headers;
 };
-export type settingsGetResponseError = (settingsGetResponse400 | settingsGetResponse401 | settingsGetResponse403 | settingsGetResponse409 | settingsGetResponse413 | settingsGetResponse429 | settingsGetResponse500) & {
+export type settingsGetResponseError = (settingsGetResponse400 | settingsGetResponse401 | settingsGetResponse403 | settingsGetResponse404 | settingsGetResponse409 | settingsGetResponse413 | settingsGetResponse429 | settingsGetResponse500) & {
   headers: Headers;
 };
 
@@ -731,6 +1226,11 @@ export type settingsUpdateResponse403 = {
   status: 403
 }
 
+export type settingsUpdateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
 export type settingsUpdateResponse409 = {
   data: ProblemDto
   status: 409
@@ -754,7 +1254,7 @@ export type settingsUpdateResponse500 = {
 export type settingsUpdateResponseSuccess = (settingsUpdateResponse200) & {
   headers: Headers;
 };
-export type settingsUpdateResponseError = (settingsUpdateResponse400 | settingsUpdateResponse401 | settingsUpdateResponse403 | settingsUpdateResponse409 | settingsUpdateResponse413 | settingsUpdateResponse429 | settingsUpdateResponse500) & {
+export type settingsUpdateResponseError = (settingsUpdateResponse400 | settingsUpdateResponse401 | settingsUpdateResponse403 | settingsUpdateResponse404 | settingsUpdateResponse409 | settingsUpdateResponse413 | settingsUpdateResponse429 | settingsUpdateResponse500) & {
   headers: Headers;
 };
 
@@ -801,4 +1301,1011 @@ const res = await fetch(getSettingsUpdateUrl(),
 
   const data: settingsUpdateResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as settingsUpdateResponse
+}
+
+
+
+export type categoriesListResponse200 = {
+  data: CategoryPageDto
+  status: 200
+}
+
+export type categoriesListResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesListResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesListResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesListResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesListResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesListResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesListResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesListResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesListResponseSuccess = (categoriesListResponse200) & {
+  headers: Headers;
+};
+export type categoriesListResponseError = (categoriesListResponse400 | categoriesListResponse401 | categoriesListResponse403 | categoriesListResponse404 | categoriesListResponse409 | categoriesListResponse413 | categoriesListResponse429 | categoriesListResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesListResponse = (categoriesListResponseSuccess | categoriesListResponseError)
+
+export const getCategoriesListUrl = (params?: CategoriesListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/categories?${stringifiedParams}` : `/api/v1/categories`
+}
+
+/**
+ * @summary Список собственных записей с серверной пагинацией
+ */
+export const categoriesList = async (params?: CategoriesListParams, options?: RequestInit): Promise<categoriesListResponse> => {
+
+  const res = await fetch(getCategoriesListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesListResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesListResponse
+}
+
+
+
+export type categoriesCreateResponse201 = {
+  data: CategoryDto
+  status: 201
+}
+
+export type categoriesCreateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesCreateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesCreateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesCreateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesCreateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesCreateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesCreateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesCreateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesCreateResponseSuccess = (categoriesCreateResponse201) & {
+  headers: Headers;
+};
+export type categoriesCreateResponseError = (categoriesCreateResponse400 | categoriesCreateResponse401 | categoriesCreateResponse403 | categoriesCreateResponse404 | categoriesCreateResponse409 | categoriesCreateResponse413 | categoriesCreateResponse429 | categoriesCreateResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesCreateResponse = (categoriesCreateResponseSuccess | categoriesCreateResponseError)
+
+export const getCategoriesCreateUrl = () => {
+
+
+
+
+  return `/api/v1/categories`
+}
+
+/**
+ * @summary Создать запись с атомарным аудитом
+ */
+export const categoriesCreate = async (categoryInputDto: CategoryInputDto, options?: RequestInit): Promise<categoriesCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCategoriesCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(categoryInputDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesCreateResponse
+}
+
+
+
+export type categoriesOptionsResponse200 = {
+  data: CategoryDto[]
+  status: 200
+}
+
+export type categoriesOptionsResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesOptionsResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesOptionsResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesOptionsResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesOptionsResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesOptionsResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesOptionsResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesOptionsResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesOptionsResponseSuccess = (categoriesOptionsResponse200) & {
+  headers: Headers;
+};
+export type categoriesOptionsResponseError = (categoriesOptionsResponse400 | categoriesOptionsResponse401 | categoriesOptionsResponse403 | categoriesOptionsResponse404 | categoriesOptionsResponse409 | categoriesOptionsResponse413 | categoriesOptionsResponse429 | categoriesOptionsResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesOptionsResponse = (categoriesOptionsResponseSuccess | categoriesOptionsResponseError)
+
+export const getCategoriesOptionsUrl = () => {
+
+
+
+
+  return `/api/v1/categories/options`
+}
+
+/**
+ * @summary Собственный компактный справочник для выбора и фильтрации; включает архив для истории
+ */
+export const categoriesOptions = async ( options?: RequestInit): Promise<categoriesOptionsResponse> => {
+
+  const res = await fetch(getCategoriesOptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesOptionsResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesOptionsResponse
+}
+
+
+
+export type categoriesGetResponse200 = {
+  data: CategoryDto
+  status: 200
+}
+
+export type categoriesGetResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesGetResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesGetResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesGetResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesGetResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesGetResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesGetResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesGetResponseSuccess = (categoriesGetResponse200) & {
+  headers: Headers;
+};
+export type categoriesGetResponseError = (categoriesGetResponse400 | categoriesGetResponse401 | categoriesGetResponse403 | categoriesGetResponse404 | categoriesGetResponse409 | categoriesGetResponse413 | categoriesGetResponse429 | categoriesGetResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesGetResponse = (categoriesGetResponseSuccess | categoriesGetResponseError)
+
+export const getCategoriesGetUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/categories/${id}`
+}
+
+/**
+ * @summary Получить собственную запись
+ */
+export const categoriesGet = async (id: string, options?: RequestInit): Promise<categoriesGetResponse> => {
+
+  const res = await fetch(getCategoriesGetUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesGetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesGetResponse
+}
+
+
+
+export type categoriesUpdateResponse200 = {
+  data: CategoryDto
+  status: 200
+}
+
+export type categoriesUpdateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesUpdateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesUpdateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesUpdateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesUpdateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesUpdateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesUpdateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesUpdateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesUpdateResponseSuccess = (categoriesUpdateResponse200) & {
+  headers: Headers;
+};
+export type categoriesUpdateResponseError = (categoriesUpdateResponse400 | categoriesUpdateResponse401 | categoriesUpdateResponse403 | categoriesUpdateResponse404 | categoriesUpdateResponse409 | categoriesUpdateResponse413 | categoriesUpdateResponse429 | categoriesUpdateResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesUpdateResponse = (categoriesUpdateResponseSuccess | categoriesUpdateResponseError)
+
+export const getCategoriesUpdateUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/categories/${id}`
+}
+
+/**
+ * @summary Изменить собственную запись; требуется хотя бы одно разрешённое поле
+ */
+export const categoriesUpdate = async (id: string,
+    categoryPatchDto: CategoryPatchDto, options?: RequestInit): Promise<categoriesUpdateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCategoriesUpdateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(categoryPatchDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesUpdateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesUpdateResponse
+}
+
+
+
+export type categoriesDeleteResponse200 = {
+  data: CategoryRemovalDto
+  status: 200
+}
+
+export type categoriesDeleteResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type categoriesDeleteResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type categoriesDeleteResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type categoriesDeleteResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type categoriesDeleteResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type categoriesDeleteResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type categoriesDeleteResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type categoriesDeleteResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type categoriesDeleteResponseSuccess = (categoriesDeleteResponse200) & {
+  headers: Headers;
+};
+export type categoriesDeleteResponseError = (categoriesDeleteResponse400 | categoriesDeleteResponse401 | categoriesDeleteResponse403 | categoriesDeleteResponse404 | categoriesDeleteResponse409 | categoriesDeleteResponse413 | categoriesDeleteResponse429 | categoriesDeleteResponse500) & {
+  headers: Headers;
+};
+
+export type categoriesDeleteResponse = (categoriesDeleteResponseSuccess | categoriesDeleteResponseError)
+
+export const getCategoriesDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/categories/${id}`
+}
+
+/**
+ * @summary Удалить собственную запись с сохранением аудита
+ */
+export const categoriesDelete = async (id: string, options?: RequestInit): Promise<categoriesDeleteResponse> => {
+
+  const res = await fetch(getCategoriesDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: categoriesDeleteResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as categoriesDeleteResponse
+}
+
+
+
+export type transactionsListResponse200 = {
+  data: TransactionPageDto
+  status: 200
+}
+
+export type transactionsListResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsListResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsListResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsListResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsListResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsListResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsListResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsListResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsListResponseSuccess = (transactionsListResponse200) & {
+  headers: Headers;
+};
+export type transactionsListResponseError = (transactionsListResponse400 | transactionsListResponse401 | transactionsListResponse403 | transactionsListResponse404 | transactionsListResponse409 | transactionsListResponse413 | transactionsListResponse429 | transactionsListResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsListResponse = (transactionsListResponseSuccess | transactionsListResponseError)
+
+export const getTransactionsListUrl = (params?: TransactionsListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/transactions?${stringifiedParams}` : `/api/v1/transactions`
+}
+
+/**
+ * @summary Список собственных записей с серверной пагинацией
+ */
+export const transactionsList = async (params?: TransactionsListParams, options?: RequestInit): Promise<transactionsListResponse> => {
+
+  const res = await fetch(getTransactionsListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsListResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as transactionsListResponse
+}
+
+
+
+export type transactionsCreateResponse201 = {
+  data: TransactionDto
+  status: 201
+}
+
+export type transactionsCreateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsCreateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsCreateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsCreateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsCreateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsCreateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsCreateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsCreateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsCreateResponseSuccess = (transactionsCreateResponse201) & {
+  headers: Headers;
+};
+export type transactionsCreateResponseError = (transactionsCreateResponse400 | transactionsCreateResponse401 | transactionsCreateResponse403 | transactionsCreateResponse404 | transactionsCreateResponse409 | transactionsCreateResponse413 | transactionsCreateResponse429 | transactionsCreateResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsCreateResponse = (transactionsCreateResponseSuccess | transactionsCreateResponseError)
+
+export const getTransactionsCreateUrl = () => {
+
+
+
+
+  return `/api/v1/transactions`
+}
+
+/**
+ * @summary Создать запись с атомарным аудитом
+ */
+export const transactionsCreate = async (transactionInputDto: TransactionInputDto, options?: RequestInit): Promise<transactionsCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getTransactionsCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(transactionInputDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as transactionsCreateResponse
+}
+
+
+
+export type transactionsGetResponse200 = {
+  data: TransactionDto
+  status: 200
+}
+
+export type transactionsGetResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsGetResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsGetResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsGetResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsGetResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsGetResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsGetResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsGetResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsGetResponseSuccess = (transactionsGetResponse200) & {
+  headers: Headers;
+};
+export type transactionsGetResponseError = (transactionsGetResponse400 | transactionsGetResponse401 | transactionsGetResponse403 | transactionsGetResponse404 | transactionsGetResponse409 | transactionsGetResponse413 | transactionsGetResponse429 | transactionsGetResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsGetResponse = (transactionsGetResponseSuccess | transactionsGetResponseError)
+
+export const getTransactionsGetUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/transactions/${id}`
+}
+
+/**
+ * @summary Получить собственную запись
+ */
+export const transactionsGet = async (id: string, options?: RequestInit): Promise<transactionsGetResponse> => {
+
+  const res = await fetch(getTransactionsGetUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsGetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as transactionsGetResponse
+}
+
+
+
+export type transactionsUpdateResponse200 = {
+  data: TransactionDto
+  status: 200
+}
+
+export type transactionsUpdateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsUpdateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsUpdateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsUpdateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsUpdateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsUpdateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsUpdateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsUpdateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsUpdateResponseSuccess = (transactionsUpdateResponse200) & {
+  headers: Headers;
+};
+export type transactionsUpdateResponseError = (transactionsUpdateResponse400 | transactionsUpdateResponse401 | transactionsUpdateResponse403 | transactionsUpdateResponse404 | transactionsUpdateResponse409 | transactionsUpdateResponse413 | transactionsUpdateResponse429 | transactionsUpdateResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsUpdateResponse = (transactionsUpdateResponseSuccess | transactionsUpdateResponseError)
+
+export const getTransactionsUpdateUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/transactions/${id}`
+}
+
+/**
+ * @summary Изменить собственную запись; требуется хотя бы одно разрешённое поле
+ */
+export const transactionsUpdate = async (id: string,
+    transactionPatchDto: TransactionPatchDto, options?: RequestInit): Promise<transactionsUpdateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getTransactionsUpdateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(transactionPatchDto)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsUpdateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as transactionsUpdateResponse
+}
+
+
+
+export type transactionsDeleteResponse204 = {
+  data: void
+  status: 204
+}
+
+export type transactionsDeleteResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsDeleteResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsDeleteResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsDeleteResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsDeleteResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsDeleteResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsDeleteResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsDeleteResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsDeleteResponseSuccess = (transactionsDeleteResponse204) & {
+  headers: Headers;
+};
+export type transactionsDeleteResponseError = (transactionsDeleteResponse400 | transactionsDeleteResponse401 | transactionsDeleteResponse403 | transactionsDeleteResponse404 | transactionsDeleteResponse409 | transactionsDeleteResponse413 | transactionsDeleteResponse429 | transactionsDeleteResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsDeleteResponse = (transactionsDeleteResponseSuccess | transactionsDeleteResponseError)
+
+export const getTransactionsDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/transactions/${id}`
+}
+
+/**
+ * @summary Удалить собственную запись с сохранением аудита
+ */
+export const transactionsDelete = async (id: string, options?: RequestInit): Promise<transactionsDeleteResponse> => {
+
+  const res = await fetch(getTransactionsDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsDeleteResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as transactionsDeleteResponse
 }

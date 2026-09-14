@@ -14,14 +14,22 @@ export function createOpenApi(app: INestApplication) {
     new DocumentBuilder()
       .setTitle('Finora API')
       .setDescription(
-        'Finora: авторизация и настройки профиля. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.',
+        'Finora: авторизация, настройки, категории и операции. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.',
       )
-      .setVersion('0.4.0')
+      .setVersion('0.5.0')
       .addCookieAuth('finora_session')
       .build(),
     { extraModels: [ProblemDto] },
   );
-  for (const name of ['LoginInputDto', 'RegisterInputDto', 'ProfileInputDto']) {
+  for (const name of [
+    'LoginInputDto',
+    'RegisterInputDto',
+    'ProfileInputDto',
+    'CategoryInputDto',
+    'CategoryPatchDto',
+    'TransactionInputDto',
+    'TransactionPatchDto',
+  ]) {
     const schema = document.components?.schemas?.[name];
     if (schema && !('$ref' in schema)) schema.additionalProperties = false;
   }

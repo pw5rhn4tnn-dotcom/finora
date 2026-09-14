@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { financeAcceptance } from './finance-acceptance.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, copyFile, rm } from 'node:fs/promises';
@@ -90,7 +91,8 @@ async function verifyHttp() {
     assert.equal(response.status, 200, path);
     await response.text();
   }
-  assert.equal((await fetch(`${url}/api/v1/transactions`)).status, 404);
+  assert.equal((await fetch(`${url}/api/v1/unknown`)).status, 404);
+  assert.equal((await fetch(`${url}/api/v1/transactions`)).status, 401);
   const raw = await compose('ps', '--format', 'json');
   const services = raw
     .trim()
@@ -187,6 +189,10 @@ try {
   await compose('up', '-d', '--wait', '--wait-timeout', '180');
   await verifyHttp();
   assert.equal(await databaseHash(), before);
+  const financeUrl = `http://${(await compose('port', 'web', '80')).trim()}`;
+  env.AUTH_ORIGINS = financeUrl;
+  await compose('up', '-d', '--wait', '--wait-timeout', '180', 'api');
+  await financeAcceptance(financeUrl, compose, databaseHash);
   if (process.argv.includes('--browser')) {
     // Сначала сохранены все прежние проверки dataset/readiness/restart.
     const browserUrl = `http://${(await compose('port', 'web', '80')).trim()}`;

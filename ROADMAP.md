@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0–3 завершены; по данным пользователя исходный `main` после CI-fix прошёл GitHub Actions. Stage 4 — Authentication & User Isolation полностью завершён локально, полный CI-equivalent и auth Playwright через Nginx пройдены. Stage 5–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0–5 завершены. Stage 5 — Categories & Transactions Core полностью завершён локально: полный CI-equivalent, отдельный self-review и повторные проверки пройдены. По данным пользователя последний remote GitHub Actions после Stage 4 был зелёным; Stage 5 не публиковался, commit/push не выполнялись. Stage 6–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -84,7 +84,7 @@ Acceptance подтверждена реальной PostgreSQL и Playwright ч
 31 frontend tests, 29 backend tests по счётчику node:test (с родительскими tests),
 15 прежних shell E2E и 11 auth Compose E2E — успешно; полный локальный эквивалент
 CI зелёный. Schema/baseline и deterministic seed dataset сохранены.
-Stage 5 не начинался; commit/push не выполнялись. Детали и ограничения — в REPORT.
+На момент завершения Stage 4 Stage 5 не начинался; текущий статус указан ниже. Детали и ограничения — в REPORT.
 
 **Цель:** обеспечить регистрацию, вход и серверную изоляцию данных.
 
@@ -101,6 +101,15 @@ Stage 5 не начинался; commit/push не выполнялись. Дет
 **Документация / REPORT:** cookie/TTL/выход, точные лимиты и Origin-настройки, результаты security-проверок; только реальные demo credentials в README/Login screen.
 
 ## Stage 5 — Categories & Transactions Core
+
+**Фактическое состояние: completed (локально, 2026-09-14).** Категории и операции,
+архивирование, деньги/rate snapshots, ownership, фильтры/поиск/сортировки/pagination,
+Sheet формы и atomic audit реализованы. Schema и достаточный rich seed сохранены.
+42 backend tests (с родительскими node:test), 47 frontend tests, 15 shell E2E и
+18 Compose E2E (11 auth + 7 finance) прошли. Полный локальный CI-equivalent,
+Docker clean/repeated startup, DB recovery и persistence после mutations — PASS.
+Отдельный self-review выполнен, исправления проверены повторно. Stage 6 не начат.
+Commit/push не выполнялись; remote-run Stage 5 не заявляется. Детали — в REPORT.
 
 **Цель:** получить полноценный ежедневный учет с корректной валютной моделью.
 

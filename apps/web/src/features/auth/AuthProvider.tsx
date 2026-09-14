@@ -1,5 +1,5 @@
 import { AuthContext, sessionKey, removeUserData } from './auth-context';
-import { type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UserDto } from '@finora/api-client';
 import { currentUser } from '../../shared/api/client';
@@ -23,5 +23,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 0,
     refetchOnWindowFocus: 'always',
   });
+  // После размонтирования защищённого дерева убираем queries, которые его
+  // observers успели пересоздать между cancelQueries и заменой сессии.
+  useEffect(() => {
+    if (session.data === null)
+      client.removeQueries({
+        predicate: (query) =>
+          query.queryKey[0] !== 'session' &&
+          query.queryKey[0] !== 'preference-options',
+      });
+  }, [client, session.data]);
   return <AuthContext value={session}>{children}</AuthContext>;
 }

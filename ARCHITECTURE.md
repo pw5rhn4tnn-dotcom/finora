@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1–4. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Финансовые функции Stage 5+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–5; результаты приёмки Stage 5 — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Бюджеты, analytics, scheduler, CSV и audit UI Stage 6+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -483,3 +483,48 @@ CI foundation дополнен `pnpm test:e2e:auth`: прежний Docker runne
 сначала проверяет полный seed/restart/readiness, затем запускает auth Playwright через
 Nginx; обычный Docker job и все старые assertions сохранены. Web Dockerfile копирует
 исходники api-client, поскольку теперь имеет реального workspace-потребителя.
+
+## 29. Реализованный Stage 5 — Categories & Transactions Core
+
+CategoriesModule/TransactionsModule следуют Controller → Service → Prisma. Zod
+strict DTO boundary проверяет UUID, scalar types, длины, валюты, calendar dates,
+positive decimal/rate и bounded query. Controller возвращает Swagger DTO;
+OpenAPI 0.5.0 и Orval Fetch client генерируются штатно. Новых dependencies нет.
+
+Все domain writes сначала берут FOR UPDATE пользователя, как UsersService;
+затем читают/изменяют строки с owner predicate. Эта общая блокировка сериализует
+категории, операции и смену основной валюты одного владельца, предотвращая
+archive/create, type/update и first transaction/baseCurrency races. Между
+разными пользователями сериализации нет. Составные FK, CHECK и runtime audit
+permissions сохранены; schema/migration не изменяются. Duplicate category policy:
+имя с trim и case-insensitive сравнением внутри типа/владельца, включая архив,
+проверяется под той же блокировкой.
+
+Financial snapshot использует отдельный Decimal constructor precision 60;
+глобальная конфигурация Prisma Decimal и seed не изменяется. Нормализация округляет
+HALF_UP к локальной ICU точности валюты; переполнение проверяется до записи.
+Дата остаётся DATE, сериализуется как YYYY-MM-DD. AuditWriter получает тот же
+транзакционный клиент; snapshots содержат разрешённые доменные поля, decimal
+strings и сохранённое название категории. Ошибка audit откатывает изменения,
+включая деактивацию связанных rules при архивировании категории.
+
+Оба списка читают страницу и total в RepeatableRead. Transaction query ограничен
+владельцем; все filters применяются в PostgreSQL, amount по normalized value,
+LIKE-спецсимволы поиска экранированы, порядок дополнен id. Offset bounded,
+pageSize 10/25/50. /categories/options — явный компактный справочник для selectors,
+а не загрузка финансовой истории в браузер. Seed уже содержит 288 операций,
+валюты RUB/USD/EUR и 364 snapshots, поэтому расширять/перезаписывать его не нужно.
+
+Frontend pages компонуют finance features и shared primitives. Query keys:
+['finance', userId, resource, params]; abort signal передаётся generated client.
+Mutations без retry используют прежний account-write boundary, блокирующий logout.
+Списки и session lock инвалидируются после server success; 401 очищает сессию,
+late response другого владельца не меняет новую сессию. Дополнительная очистка
+AuthProvider после anonymous render удаляет пересозданные уходящим observer queries.
+Skip link находится в AuthBoundary и остаётся доступным во время загрузки сессии.
+
+Формы RHF/Zod, листы и подтверждения используют общий Radix Sheet. Редактирование
+и удаление принадлежат странице через ActiveFinanceSheet; изменение query или
+исчезновение строки не уничтожает открытый черновик. Focus возвращается trigger,
+а если строки больше нет — main. Pending блокирует повтор и закрытие панели.
+Stage 6 и интерфейс audit отсутствуют.

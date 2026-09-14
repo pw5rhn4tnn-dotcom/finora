@@ -29,9 +29,6 @@ export function AppShell() {
   }, [location.pathname, location.state]);
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
-        Перейти к содержимому
-      </a>
       <Sidebar />
       <div className="shell-body">
         <header className="topbar">

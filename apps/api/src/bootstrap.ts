@@ -23,7 +23,7 @@ export async function bootstrap(port = 3000, host = '127.0.0.1') {
   app.enableCors({
     origin: origins,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
   });
   const logger = new Logger('HTTP');

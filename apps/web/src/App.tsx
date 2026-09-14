@@ -1,5 +1,7 @@
 import { AuthBoundary } from './features/auth/AuthBoundary';
 import { AuthPage } from './pages/AuthPage';
+import { TransactionsPage } from './pages/TransactionsPage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router';
@@ -23,10 +25,17 @@ export function App() {
       />
       <Route element={<AuthBoundary />}>
         <Route element={<AppShell />}>
+          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route index element={<OverviewPage />} />
           {navigation
-            .filter((item) => item.to !== '/' && item.to !== '/settings')
+            .filter(
+              (item) =>
+                !['/', '/settings', '/transactions', '/categories'].includes(
+                  item.to,
+                ),
+            )
             .map((item) => (
               <Route
                 key={item.to}

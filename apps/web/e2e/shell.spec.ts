@@ -1,10 +1,19 @@
-import { testUser } from '../src/test/fixtures';
+import { testUser, testOptions } from '../src/test/fixtures';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // Изолированные регрессии Stage 3 получают авторизованную сессию.
 // Реальные cookie/Nginx/DB сценарии находятся в auth.compose.spec.ts.
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/transactions?*', (route) =>
+    route.fulfill({ json: { items: [], page: 1, pageSize: 25, total: 0 } }),
+  );
+  await page.route('**/api/v1/categories/options', (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route('**/api/v1/settings/options', (route) =>
+    route.fulfill({ json: testOptions }),
+  );
   await page.route('**/api/v1/auth/me', (route) =>
     route.fulfill({ json: testUser }),
   );

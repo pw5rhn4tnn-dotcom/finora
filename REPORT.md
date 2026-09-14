@@ -885,3 +885,186 @@ PROJECT, DISCOVERY, AI_RULES, Prisma schema и baseline сохранены бе�
 Commit/push, force и history rewrite не выполнялись.
 
 Предлагаемый commit: feat(auth): добавить авторизацию и изоляцию пользователей Finora
+
+## 2026-09-14 — Stage 5: Categories & Transactions Core
+
+Работа выполняется Codex desktop в исходном рабочем дереве, без subagents,
+commit/push и изменения Git history. Исходное дерево было чистым. Источники
+и реализация Stage 1–4 сопоставлены с Stage 5 ROADMAP: категории, операции,
+валютные snapshots, поиск/фильтры/сортировки, pagination 10/25/50, responsive
+формы и атомарный audit. Stage 6 не начат.
+
+Реальный фрагмент prompt: «Backend API является source of truth» и
+«Если хотя бы один обязательный пункт не выполнен — НЕ называй Stage 5 завершённым».
+Итоговые результаты приёмки записаны в конце этой секции.
+
+Первый цикл: schema/migration и rich seed уже покрывают этап, поэтому не изменены.
+Добавлены CategoriesModule и TransactionsModule с общей блокировкой владельца,
+согласованной с UsersService. Эта блокировка сериализует собственные финансовые
+записи, изменения категорий и baseCurrency; разные владельцы независимы.
+Новые category duplicates проверяются case-insensitive по имени и типу под той же
+блокировкой, включая архивные категории. Составные ownership FK сохранены.
+
+Чистые money/date helpers валидируют decimal strings и календарные даты.
+Клон Decimal с precision 60 сохраняет произведение до единственного HALF_UP
+округления к точности основной валюты из локального ICU. Исходная сумма также
+проверяется по точности валюты. Допустимо округление очень маленького положительного
+пересчёта к нулю; исходные amount/rate обязаны быть положительными. Точность хранения
+и прежние ограничения NUMERIC не менялись. Описание обязательно, trim, 1–500 символов;
+название категории trim, 1–100, type/icon/color проверяются сервером.
+
+Новые PostgreSQL сценарии прошли в первом прогоне; прежний smoke ожидал 404 от
+ещё не существовавшего /transactions. Проверка неизвестного маршрута сохранена
+на /unknown, для /transactions добавлен 401. Это изменение контракта этапа,
+а не ослабление проверки. Аналогично расширен Compose runner.
+
+При компонентной проверке обнаружены и исправлены загрузка CSS tokens через
+единый stylesheet, потеря focus при debounce remount и пересоздание query уходящим
+observer после expiry. Последняя исправлена минимально в AuthProvider, с сохранением
+Stage 4 session observer. После исправления 44 frontend tests прошли.
+Первая frozen установка блокировалась DNS sandbox; сетевой повтор фиксируется
+отдельно по результату. Зависимости и lockfile не меняются.
+
+Дополнительные проверки настоящего браузера нашли потерю открытого диалога при
+обновлении отфильтрованной строки. Диалог вынесен на уровень страницы, восстановление
+фокуса учитывает исчезнувший trigger; добавлен regression test. Исправлены также
+ожидание окончания isSubmitting перед focus и отмена публичного справочника валют
+при гостевой сессии (отдельный компонентный regression). Skip link сохраняется
+при переходе из загрузки session в authenticated shell.
+
+Проверка 200% текста на 320px выявила два дефекта общих primitives: заголовок Sheet
+вытеснял её body из доступной прокрутки, а контейнер действия PageHeader мог быть
+шире страницы. Панель теперь прокручивается целиком, padding ограничен шириной;
+контейнер действия ограничен max-width. Диагностическая проверка геометрии показывает
+конкретные выходящие за viewport элементы, строгий no-overflow assertion сохранён.
+
+Один повтор Compose/shell был испорчен ошибкой процесса проверки: две одновременно
+запущенные Playwright-команды очищали общий test-results и получали ENOENT traces.
+Это не скрыто как PASS; последующие browser suites выполняются последовательно.
+Отдельный Docker job прошёл полностью: clean/repeated startup, seed ×3, DB recovery,
+Stage 5 CRUD/isolation/archive, seed после мутаций, API restart и сохранность
+edited/deleted state. Baseline SHA-256:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+
+Таблетный reflow дополнительно потребовал переноса длинных labels и выбора
+колонок/мобильного фильтра по доступной ширине контейнера. Category grid также
+учитывает фактическое пространство при увеличенном шрифте. Временный диагностический
+E2E удалён после проверки 320/390/768/1440/1920/640×320; основные Compose assertions
+сохранены. Неверное ожидание в новом E2E (переход на login до завершения logout)
+исправлено добавлением проверки фактического /login после каждого выхода.
+
+### Отдельный self-review после первого зелёного Compose прогона
+
+Первый полный успешный browser acceptance: 18/18; foundation: backend 41/41,
+frontend 46/46, Prisma/lint/format/typecheck/build/api:check PASS. После этого
+проведён отдельный review HTTP boundaries, ownership predicates, Decimal/date,
+user row lock, атомарности audit, cache keys/expiry, query bounds, форм и CSS.
+
+Найденные и исправленные проблемы:
+
+- `Prisma insensitive equals` использует ILIKE: имя `%` ошибочно конфликтовало
+  с любым существующим именем. Новый PostgreSQL regression воспроизвёл 409 вместо 201. Теперь `%`, `_` и обратный слеш экранируются в параметре; literal names и
+  реальные case-insensitive duplicates проверены. SQL остаётся параметризованным.
+- Создание из EmptyState ещё имело отдельную обёртку диалога и теряло возврат
+  фокуса при исчезновении trigger после фонового появления записи. Regression
+  воспроизвёл focus на body вместо main. Все create/edit/delete теперь принадлежат
+  одной странице; лишние Editor wrappers удалены, оставлены CategoryForm и
+  TransactionForm. Черновик и fallback focus проверены.
+- Success после удаления категории был неточным («удалена или перенесена»).
+  Mutation hook передаёт подтверждённый результат, UI сообщает конкретный outcome;
+  компонентный test проверяет архивирование.
+
+Повтор после исправлений: backend **42/42** (включая родительские node:test),
+frontend **47/47**, typecheck/lint/build/api:check PASS. Нет новых dependencies,
+`any`, подавлений TypeScript/lint, TODO вместо Stage 5 поведения или параллельного
+handwritten финансового клиента. Списки ограничены 10/25/50 и имеют единый snapshot
+items/count; отдельный собственный компактный categories/options предназначен
+для выбора связи, без загрузки всей финансовой истории. Архивирование связанных
+правил выполняется в той же transaction; scheduler не добавлялся.
+
+### Контракты, данные и границы этапа
+
+API: GET/POST categories и transactions; GET/PATCH/DELETE по ID;
+GET categories/options. Owner берётся только из auth context. DTO строгие,
+неизвестные поля отвергаются; все существующие guards, cookies, Origin, CORS,
+rate limits и Problem Details сохранены (CORS дополнен DELETE). Чужой ID и
+отсутствующий ID неразличимы по domain response; чужая category relation не
+связывается ни при create, ни при patch. Ответы и audit snapshots содержат
+явно разрешённые поля, деньги сериализуются строками.
+
+Frontend: реальные /categories и /transactions, Sheet forms/confirmations,
+loading/empty/error/retry/success/pending, URL filters и server pagination.
+Сортировки и amount range используют amountInBaseCurrency. Поиск буквальный,
+без регистра, по description/category. Query keys включают userId, AbortSignal
+передаётся generated client, поздний 401 прежней сессии не сбрасывает нового
+владельца. Mutation не повторяется автоматически, двойной click не создаёт дубль.
+
+Prisma schema, применённые migrations, runtime permissions и seed не менялись:
+16 categories, 288 transactions, 16 budgets, 6 recurring rules, 364 audit entries,
+два изолированных demo-пользователя, шесть месяцев и RUB/USD/EUR уже достаточны
+для Stage 5. Seed остаётся одноразовым атомарным, повтор не перезаписывает edits
+и не восстанавливает deletes. Косметические migrations не создавались.
+
+Stage 6+ остаются будущими: budgets API/UI, Dashboard/Insights aggregation,
+recurring execution/scheduler, CSV, audit reader/UI, dark mode. Фактических
+расхождений scope с ROADMAP не найдено; развитие seed реализовано проверкой
+уже достаточного rich dataset без изменения его данных.
+
+### Ограничения проверки
+
+Проверки браузера выполнены в Chromium на macOS через production Compose/Nginx,
+а не на физических телефонах и не с настоящим screen reader. Axe WCAG 2/2.1/2.2 AA,
+keyboard/focus, reduced motion, длинные названия/описания/суммы и 200% font reflow
+проверяются автоматически. Встроенный браузер дополнительно использован для
+визуальной проверки desktop/mobile списка, категорий, формы и mobile filters.
+
+Vite предупреждает о JS chunk чуть больше 500 kB до gzip; сборка успешна,
+лимит предупреждения не увеличен. Произвольные вручную повторённые POST операций
+не имеют нового idempotency contract: одинаковые реальные операции допустимы;
+UI защищён от двойного нажатия и автоматических retry. Прежний stateless logout
+очищает cookie, но скопированный JWT остаётся валиден до TTL. Remote GitHub Actions
+для Stage 5 не запускался: commit/push запрещены; remote Stage 4 — прежняя стабильная
+точка, указанная пользователем. Новая проверка — локальный эквивалент CI.
+
+### Итоговая приёмка Stage 5 — completed
+
+Все обязательные quality gates выполнены. После self-review повторно пройдены
+затронутые проверки; browser команды выполнялись последовательно, без конфликта
+артефактов. Финальный shell: **15/15**, без retries; финальный Compose browser:
+**18/18**, без retries (11 существующих auth + 7 новых finance), 23,3 с браузерной
+части. Backend **42/42**, frontend **47/47**; новых Stage 5 backend tests по счётчику
+node:test — 13 (в том числе родительский), новых frontend tests — 16.
+
+| Проверка реального CI                                              | Результат                                           |
+| ------------------------------------------------------------------ | --------------------------------------------------- |
+| Node 24.21.0 / pnpm 12.4.1; frozen install и Prisma generate       | PASS; сетевой повтор после sandbox DNS успешен      |
+| pnpm db:validate                                                   | PASS                                                |
+| Migrate deploy на пустой БД и повторно; constraints/runtime grants | PASS в PostgreSQL tests и Docker                    |
+| pnpm lint                                                          | PASS, без подавлений                                |
+| pnpm format:check                                                  | PASS                                                |
+| pnpm typecheck                                                     | PASS                                                |
+| pnpm test (backend/frontend)                                       | PASS, итог 42 / 47                                  |
+| pnpm build                                                         | PASS; предупреждение Vite о chunk >500 kB сохранено |
+| Playwright install --with-deps chromium                            | PASS                                                |
+| pnpm test:e2e                                                      | PASS, 15 shell                                      |
+| pnpm api:generate / pnpm api:check                                 | PASS, Swagger/Orval воспроизводимы                  |
+| pnpm test:e2e:auth                                                 | PASS, 18 browser + полный Compose acceptance        |
+| pnpm test:docker (отдельный Docker job)                            | PASS                                                |
+| git diff --check                                                   | PASS                                                |
+
+Docker доказывает clean copy без node_modules/.env, clean/repeated startup,
+healthy PostgreSQL/API/Nginx, migrate deploy, seed ×3 без изменения baseline,
+readiness **200 → 503 → 200** и liveness при DB outage. Расширенная проверка после
+реальных Stage 5 mutations доказывает изоляцию, category archive, повторный seed,
+API restart и сохранность create/edit/delete. Временные acceptance volumes
+удалены runner в finally; дополнительная тестовая PostgreSQL и dev-серверы
+остановлены/удалены. Пользовательские данные не использовались для тестовых мутаций.
+
+Изменения: backend category/transaction modules и общие finance helpers/DTO,
+расширенный audit writer, HTTP registration/CORS/errors, OpenAPI/Orval artifacts;
+frontend finance pages/forms/filters/list/pagination/session и необходимые fixes
+общих primitives; PostgreSQL/component/browser/Compose tests и runner; README,
+ARCHITECTURE, ROADMAP, web README, REPORT и название CI шага.
+
+Stage 5 завершён. Stage 6 не начинался. Commit/push и изменение Git history
+не выполнялись. Remote CI для этой незакоммиченной версии не запускался.

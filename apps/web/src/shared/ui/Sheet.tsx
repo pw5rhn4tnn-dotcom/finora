@@ -12,9 +12,11 @@ export function SheetContent({
   description,
   children,
   className = '',
+  closeDisabled = false,
   ...props
 }: Omit<ComponentProps<typeof Dialog.Content>, 'title'> & {
   title: string;
+  closeDisabled?: boolean;
   description: string;
   children: ReactNode;
 }) {
@@ -30,7 +32,7 @@ export function SheetContent({
             </Dialog.Description>
           </div>
           <Dialog.Close asChild>
-            <IconButton label="Закрыть панель">
+            <IconButton label="Закрыть панель" disabled={closeDisabled}>
               <X aria-hidden="true" />
             </IconButton>
           </Dialog.Close>

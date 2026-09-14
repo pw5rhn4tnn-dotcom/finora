@@ -1,7 +1,7 @@
-# Frontend Finora · Stage 3–4
+# Frontend Finora · Stage 3–5
 
 Работающая адаптивная оболочка, общие UI primitives и светлая тема.
-Stage 4 реализует авторизацию и настройки профиля. Финансовые функции ещё не реализованы. Разделы явно обозначены
+Stage 4 реализует авторизацию и настройки профиля. Stage 5 добавляет реальные категории и операции. Остальные финансовые разделы ещё не реализованы. Разделы явно обозначены
 как предварительный просмотр. Главный экран не использует seed и не показывает
 вымышленные финансовые показатели.
 
@@ -45,8 +45,7 @@ singleton. AuthProvider получает сессию через generated `/aut
 | Motion    | tokens 150/200/250ms; загрузочный pulse 1500ms; reduced-motion отключает все transition/animation                                                                    |
 
 Финансовый пример в dev-витрине имеет русское представление `12 450,00 ₽` и явно
-подписан как пример. Реального money formatter/API conversion ещё нет: decimal
-contracts и доменные правила будут подключены на соответствующих этапах.
+подписан как пример. Stage 5 форматирует реальные decimal strings без Number: целая часть через BigInt, дробная — строкой. Все расчёты выполняет API.
 Иконки Lucide импортируются по именам, tree shaking исключает неиспользованные.
 Только статический favicon/meta theme-color повторяет brand hex за пределами CSS.
 
@@ -160,3 +159,41 @@ landscape и 200% шрифт. Денежных вычислений в этих 
 Сквозной auth suite использует настоящие cookie, API и PostgreSQL; только сценарии
 сбоев/загрузки явно перехватывают сетевой ответ. Suite выполняется последовательно,
 без retries, в собственной disposable БД, с детерминированным новым аккаунтом.
+
+## Stage 5: категории и Transaction Explorer
+
+`pages/TransactionsPage` и `pages/CategoriesPage` компонуют `features/finance`:
+Query/mutation hooks поверх Orval, editor forms, stable page dialog, подтверждение
+удаления, фильтры, pagination, CategoryMark и точное представление денег/дат.
+Нового handwritten HTTP client, state store или UI kit нет. CSS finance подключён
+через единый shared/styles/index.css и использует существующие tokens/breakpoints.
+
+URL хранит server filters/page/sort. Search debounce 300 мс сохраняет focus;
+pageSize 10/25/50. Фильтры суммы подписаны baseCurrency. Mobile использует cards и
+filter Sheet, desktop — четыре колонки операций; длинные тексты и суммы переносятся.
+Нативные selectors доступны с клавиатуры. Цвет категории — декоративная метка;
+иконка, название и текстовый статус не полагаются на выбранный пользователем цвет.
+
+Loading/empty/filtered-empty/error/retry, background refetch, pending и success
+реализованы. Деньги отправляются decimal strings; ввод с запятой нормализуется.
+Base currency rate=1, изменение валюты очищает старый rate; серверная ошибка поля
+объявляется и получает focus после pending. API остаётся validation authority.
+
+Диалог создания/редактирования/удаления живёт на уровне страницы, вне строк списка и EmptyState, поэтому refetch и debounce
+не закрывают форму. Pending блокирует submit, dismiss и logout; recoverable error
+сохраняет черновик, автоматического повтора mutation нет. Удаление требует явного
+подтверждения и не использует optimistic disappearance. Focus после закрытия
+возвращается trigger либо main, если строка исчезла. Logout/401 очищает данные;
+ключи Query включают userId, старые abortable requests не подменяют новые.
+
+`finance.test.tsx` проверяет формы, CRUD, loading/empty/retry/pending, filters,
+cache/expiry/races и сохранность открытого черновика при refetch. Новый
+`finance.compose.spec.ts` проходит реальный category/transaction CRUD, reload,
+logout/login, isolation и responsive/axe/keyboard без моков backend. В режиме
+FINORA_COMPOSE_URL Playwright запускает все *.compose.spec.ts; shell suite остаётся
+изолированным и использует явные financial fixtures, сохраняя прежние assertions.
+
+Итог Stage 5: 47 frontend tests, 15 shell E2E и 18 Compose E2E — PASS после
+self-review. Desktop filters учитывают ширину контейнера; при недостатке места
+доступен Sheet. Category grid, labels, PageHeader и прокрутка Sheet проверены
+при 200% текста. Подробный журнал проверок и ограничения — в ../../REPORT.md.
