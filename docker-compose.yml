@@ -24,6 +24,10 @@ services:
       NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: 3000
+      AUTH_SECRET: ${AUTH_SECRET:-finora-local-demo-secret-change-for-production}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_ORIGINS: ${AUTH_ORIGINS:-http://localhost:${WEB_PORT:-8080},http://127.0.0.1:${WEB_PORT:-8080}}
+      AUTH_TRUST_PROXY: 'true'
       DATABASE_URL: postgresql://finora_runtime:finora_local_runtime@postgres:5432/finora
       MIGRATION_DATABASE_URL: postgresql://finora_migrator:finora_local_migrator@postgres:5432/finora
       SEED_ANCHOR_DATE: ${SEED_ANCHOR_DATE:-}

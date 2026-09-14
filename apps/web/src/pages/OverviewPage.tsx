@@ -1,11 +1,20 @@
 import { ArrowRight, Compass } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { ButtonLink } from '../shared/ui/Button';
 import { Card, PageContainer, PageHeader, Section } from '../shared/ui/Surface';
 
 export function OverviewPage() {
+  const state: unknown = useLocation().state;
+  const notice =
+    state &&
+    typeof state === 'object' &&
+    'notice' in state &&
+    typeof state.notice === 'string'
+      ? state.notice
+      : null;
   return (
     <PageContainer>
+      {notice && <p role="status">{notice}</p>}
       <PageHeader
         title="Обзор"
         description="Ваши финансы. В ясной перспективе."

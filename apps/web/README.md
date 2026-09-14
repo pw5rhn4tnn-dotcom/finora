@@ -1,7 +1,7 @@
-# Frontend foundation Finora · Stage 3
+# Frontend Finora · Stage 3–4
 
 Работающая адаптивная оболочка, общие UI primitives и светлая тема.
-Авторизация и предметные функции ещё не реализованы. Разделы явно обозначены
+Stage 4 реализует авторизацию и настройки профиля. Финансовые функции ещё не реализованы. Разделы явно обозначены
 как предварительный просмотр. Главный экран не использует seed и не показывает
 вымышленные финансовые показатели.
 
@@ -17,10 +17,11 @@
 - `e2e`: настоящие браузерные проверки shell, responsive и accessibility.
 
 Shared не импортирует app/pages/domain. UI остаётся внутри web: второго потребителя
-для нового workspace UI package пока нет. `features` и `entities` появятся вместе
-с реальными функциями; пустые каталоги и domain-заглушки не создаются.
+для нового workspace UI package пока нет. `features/auth` и `features/profile` содержат формы и сессию.
+Пустые каталоги и domain-заглушки не создаются.
 QueryClient создаётся в AppProviders отдельно для каждого mount, без глобального
-singleton. Query provider пока не выполняет запросы.
+singleton. AuthProvider получает сессию через generated `/auth/me`; пользовательские данные
+удаляются при logout/смене владельца, запросы отменяются до замены сессии.
 
 ## Tokens и тема
 
@@ -66,8 +67,8 @@ Content ограничен 1200px, отступы растут с 16px до 32/4
 
 Основные маршруты соответствуют Discovery. `/transactions/import` — только
 placeholder deep link; транзакции остаются активным родительским пунктом.
-Неизвестный адрес получает честный экран 404 со ссылкой к обзору. Нет login,
-register, guards или API-запросов к будущим разделам.
+Неизвестный адрес получает честный экран 404 со ссылкой к обзору. Публичные login/register и защищённые маршруты используют auth context;
+финансовых API-запросов к будущим разделам нет.
 
 ## Использование primitives
 
@@ -127,3 +128,35 @@ landscape, keyboard/focus, размеры и видимость навигаци
 reduced motion и axe WCAG 2.2 AA для страниц и открытого dialog.
 Это accessibility foundation, а не сертификат полного приложения; реальные
 screen reader/iOS/Android проверки и domain-specific accessibility ещё впереди.
+
+## Stage 4: формы и server state
+
+`AuthPage` компонует вход/регистрацию и реальные demo-кнопки; `SettingsPage`
+показывает и сохраняет собственный профиль. React Hook Form + Zod дают ранние
+русские сообщения; API остаётся authoritative validation boundary.
+Общий адаптер `shared/api/client.ts` вызывает только generated Orval functions,
+переводит Problem Details в типизированные ошибки и скрывает transport details.
+Новых fetch endpoints, дублированных DTO и UI primitives нет.
+
+`AuthProvider` хранит результат `/auth/me` в TanStack Query. AuthBoundary
+различает initial loading, anonymous, initial error/retry и authenticated.
+Фоновая ошибка сохраняет форму и показывает retry; 401 очищает пользовательские
+данные. При смене владельца удаляются остальные queries и mutations, а observer
+сессии сохраняется. Запоздалое сохранение старого профиля не меняет нового владельца.
+Вход/регистрация/settings/logout — mutations без автоматических повторов;
+на время операции блокируются конфликтующие действия. Каталоги используют Query,
+поля не подменяются фиктивными значениями при ошибке загрузки, submit недоступен.
+
+Поля связаны с label/hint/error. Ошибки объявляются через alert, pending/success
+через status; focus после validation идёт к первому полю в порядке формы после
+снятия disabled. Переход после auth переводит focus в main. Новых modal/sheet
+форм этапу не требуется; прежний responsive Sheet и его проверки сохранены.
+Профиль использует те же tokens, Card/Input/Select/Button, 320px reflow,
+landscape и 200% шрифт. Денежных вычислений в этих формах нет.
+
+Дополнительно к `pnpm test:e2e` выполните `pnpm test:e2e:auth` из корня:
+это clean-source Compose + Playwright на production Nginx. В shell component/E2E
+тестах сессия — явная fixture; их прежние navigation/focus/axe assertions сохранены.
+Сквозной auth suite использует настоящие cookie, API и PostgreSQL; только сценарии
+сбоев/загрузки явно перехватывают сетевой ответ. Suite выполняется последовательно,
+без retries, в собственной disposable БД, с детерминированным новым аккаунтом.

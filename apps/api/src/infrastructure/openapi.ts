@@ -1,3 +1,4 @@
+import { ProblemDto } from './problem.filter.js';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -8,14 +9,21 @@ export function createOpenApi(app: INestApplication) {
       { path: 'health/ready', method: RequestMethod.GET },
     ],
   });
-  return SwaggerModule.createDocument(
+  const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
       .setTitle('Finora API')
       .setDescription(
-        'Инфраструктурный контракт Finora. Предметные функции появятся на следующих этапах.',
+        'Finora: авторизация и настройки профиля. Изменяющие запросы требуют разрешённый Origin. Сессия: HttpOnly cookie, 24 часа.',
       )
-      .setVersion('0.2.0')
+      .setVersion('0.4.0')
+      .addCookieAuth('finora_session')
       .build(),
+    { extraModels: [ProblemDto] },
   );
+  for (const name of ['LoginInputDto', 'RegisterInputDto', 'ProfileInputDto']) {
+    const schema = document.components?.schemas?.[name];
+    if (schema && !('$ref' in schema)) schema.additionalProperties = false;
+  }
+  return document;
 }

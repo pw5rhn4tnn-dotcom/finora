@@ -6,6 +6,7 @@ import { createOpenApi } from './openapi.js';
 
 // Создание документа не запускает lifecycle/connect/listen.
 process.env['DATABASE_URL'] ??= 'postgresql://unused:unused@127.0.0.1:1/unused';
+process.env['AUTH_SECRET'] ??= 'openapi-export-placeholder-32-bytes';
 const app = await NestFactory.create(AppModule, {
   abortOnError: false,
   logger: false,

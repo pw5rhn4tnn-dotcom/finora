@@ -7,6 +7,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 RUN pnpm install --frozen-lockfile --filter @finora/web --ignore-scripts
 COPY apps/web apps/web
+COPY packages/api-client/src packages/api-client/src
 RUN pnpm --filter @finora/web build
 
 FROM nginx:1.28.0-alpine

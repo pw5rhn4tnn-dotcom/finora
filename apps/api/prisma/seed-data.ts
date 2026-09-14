@@ -22,64 +22,7 @@ export const demoProfiles = [
   },
 ] as const;
 
-export const categoryTemplates = [
-  {
-    key: 'salary',
-    name: 'Зарплата',
-    type: 'INCOME',
-    icon: 'briefcase-business',
-    color: '#059669',
-  },
-  {
-    key: 'freelance',
-    name: 'Подработка',
-    type: 'INCOME',
-    icon: 'laptop',
-    color: '#0D9488',
-  },
-  {
-    key: 'groceries',
-    name: 'Продукты',
-    type: 'EXPENSE',
-    icon: 'shopping-basket',
-    color: '#4F46E5',
-  },
-  {
-    key: 'home',
-    name: 'Жильё',
-    type: 'EXPENSE',
-    icon: 'house',
-    color: '#7C3AED',
-  },
-  {
-    key: 'transport',
-    name: 'Транспорт',
-    type: 'EXPENSE',
-    icon: 'tram-front',
-    color: '#0284C7',
-  },
-  {
-    key: 'dining',
-    name: 'Кафе и рестораны',
-    type: 'EXPENSE',
-    icon: 'utensils',
-    color: '#EA580C',
-  },
-  {
-    key: 'travel',
-    name: 'Путешествия',
-    type: 'EXPENSE',
-    icon: 'train-front',
-    color: '#D97706',
-  },
-  {
-    key: 'subscriptions',
-    name: 'Подписки',
-    type: 'EXPENSE',
-    icon: 'repeat',
-    color: '#DB2777',
-  },
-] as const;
+export { categoryTemplates } from '../src/modules/categories/default-categories.js';
 
 export function seedId(key: string): string {
   const hex = createHash('sha256')

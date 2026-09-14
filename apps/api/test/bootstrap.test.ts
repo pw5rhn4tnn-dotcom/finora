@@ -5,6 +5,7 @@ import { bootstrap } from '../src/bootstrap.js';
 import { databaseFixture } from './database-fixture.js';
 
 await test('запускает Nest HTTP server с Prisma, Swagger и инфраструктурными маршрутами', async () => {
+  process.env['AUTH_SECRET'] = 'finora-test-secret-at-least-32-bytes';
   const fixture = await databaseFixture();
   const previous = process.env['DATABASE_URL'];
   process.env['DATABASE_URL'] = fixture.runtimeUrl;

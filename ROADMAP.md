@@ -1,6 +1,6 @@
 # Finora — план разработки
 
-Статус: Stage 0 зафиксирован в Git; Stage 1 — Foundation локально готов, обязательные локальные проверки пройдены. Remote CI — pending verification. Stage 2 — Database & Docker Foundation локально завершён, обязательные проверки пройдены; Stage 3 — Design System & App Shell локально завершён; Stage 4–12 не начаты. Это порядок будущих работ, фактическая история находится в [REPORT.md](REPORT.md). Продуктовые правила и приемка — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), механизмы реализации — [ARCHITECTURE.md](ARCHITECTURE.md).
+Статус: Stage 0–3 завершены; по данным пользователя исходный `main` после CI-fix прошёл GitHub Actions. Stage 4 — Authentication & User Isolation полностью завершён локально, полный CI-equivalent и auth Playwright через Nginx пройдены. Stage 5–12 не начаты. Фактическая история — [REPORT.md](REPORT.md); продуктовые правила — [DISCOVERY.md](DISCOVERY.md), обязательные требования — [PROJECT.md](PROJECT.md), архитектура — [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Каждый Stage выполняется небольшими законченными задачами. Переход возможен после его критериев готовности и проверок; проверки, которых еще нет, не объявляются успешными. Для реализуемых функций применяется полный Definition of Done из `DISCOVERY.md`, раздел 36: серверная/клиентская validation, ownership, состояния UI, доступность, реальные тесты и актуальные контракты. Тесты, audit, документация и CI развиваются одновременно с функциями, а не откладываются целиком до Stage 11.
 
@@ -76,6 +76,15 @@ Vitest и браузерные Playwright/axe проверки добавлен�
 **Документация / REPORT:** примененные tokens и компоненты, проверенные экраны/размеры, фактические UX-решения и ограничения.
 
 ## Stage 4 — Authentication & User Isolation
+
+**Фактическое состояние:** завершён локально. AuthModule/UsersModule, Argon2id,
+JWT cookie, register/login/logout/me, профиль/baseCurrency/timeZone, стандартные
+категории с атомарным audit, guards/Origin/CORS/rate limits и auth UI реализованы.
+Acceptance подтверждена реальной PostgreSQL и Playwright через production Nginx.
+31 frontend tests, 29 backend tests по счётчику node:test (с родительскими tests),
+15 прежних shell E2E и 11 auth Compose E2E — успешно; полный локальный эквивалент
+CI зелёный. Schema/baseline и deterministic seed dataset сохранены.
+Stage 5 не начинался; commit/push не выполнялись. Детали и ограничения — в REPORT.
 
 **Цель:** обеспечить регистрацию, вход и серверную изоляцию данных.
 

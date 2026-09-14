@@ -1,11 +1,10 @@
 # Finora
 
 Finora — приложение для управления личными финансами по [DISCOVERY.md](DISCOVERY.md).
-Stage 1 foundation сохранён; Stage 2 добавляет PostgreSQL/Prisma, миграции, богатый
-seed и Docker runtime. **Stage 3 — Design System & App Shell локально завершён**: светлая тема,
-reusable primitives, responsive sidebar/bottom navigation и явно обозначенные
-предварительные экраны. API содержит только инфраструктурные endpoints.
-Авторизации, финансового CRUD и dashboard ещё нет. Проверки записаны в REPORT.
+Stage 1–3 сохранены. Stage 4 добавляет регистрацию, вход/выход, JWT cookie,
+серверную изоляцию и настройки профиля. Финансовые разделы пока показывают
+предварительные экраны: CRUD, dashboard, CSV и scheduler относятся к Stage 5+.
+Фактические результаты приёмки записаны в REPORT.
 
 ## Запуск с чистого checkout
 
@@ -20,14 +19,13 @@ docker compose up
 При первом запуске Compose сам собирает отсутствующие Web/API images. Дождитесь
 готовности API и Web. Адреса по умолчанию:
 
-- [Web](http://localhost:8080) — адаптивная оболочка Stage 3;
+- [Web](http://localhost:8080) — вход, регистрация и адаптивное личное пространство;
 - [Swagger UI](http://localhost:8080/docs);
 - [OpenAPI JSON](http://localhost:8080/docs/openapi.json);
 - [Liveness](http://localhost:8080/health/live);
 - [Readiness PostgreSQL](http://localhost:8080/health/ready).
 
-API имеет prefix `/api/v1`; `/health/*` и `/docs` вынесены из него. Предметных
-маршрутов пока нет: `/api/v1/transactions` возвращает реальный 404 Problem Details.
+API имеет prefix `/api/v1`; `/health/*` и `/docs` вынесены из него. Финансовые маршруты ещё не реализованы: `/api/v1/transactions` возвращает реальный 404 Problem Details.
 Nginx раздаёт production frontend и проксирует API/Swagger/health через один origin.
 
 Startup: PostgreSQL healthcheck → проверка реального SQL-подключения →
@@ -60,7 +58,8 @@ API наружу отдельно не опубликован. PostgreSQL опу
 ## Demo dataset
 
 Два независимых профиля; общей семейной учётной записи или сущностей accounts нет.
-Пароли реально записаны как Argon2id hashes, но вход появится только на Stage 4.
+На экране входа доступны обе demo-кнопки и эти публичные credentials.
+Пароли хранятся как Argon2id hashes.
 
 | Профиль                  | Email                   | Публичный demo-пароль | Операции |
 | ------------------------ | ----------------------- | --------------------- | -------- |
@@ -82,6 +81,63 @@ Seed выполняется один раз атомарно под PostgreSQL a
 не создают дублей, не перетирают edits и не восстанавливают удалённые операции.
 Подробная карта schema → discovery, денежные диапазоны и стратегия seed находятся в
 [apps/api/prisma/README.md](apps/api/prisma/README.md).
+
+## Авторизация и настройки
+
+Публичные `/login` и `/register`; остальные product routes требуют сессию.
+Регистрация выбирает имя (1–100 символов), email (до 254), пароль (12–128),
+валюту и часовой пояс. Email trim/lowercase; дубликат возвращает 409.
+В одной транзакции создаются пользователь, 8 стандартных категорий и 8 записей
+аудита. `/settings` меняет имя, основную валюту и часовой пояс; email отображается
+без редактирования. Основная валюта доступна до первой операции, бюджета или
+recurring rule; даже удалённые финансовые данные в audit сохраняют блокировку.
+
+| Метод     | URL                        | Назначение                                                        |
+| --------- | -------------------------- | ----------------------------------------------------------------- |
+| POST      | `/api/v1/auth/register`    | Регистрация и cookie, 201                                         |
+| POST      | `/api/v1/auth/login`       | Вход и cookie, 200                                                |
+| POST      | `/api/v1/auth/logout`      | Очистка cookie, 204, в том числе для истёкшей сессии              |
+| GET       | `/api/v1/auth/me`          | Текущий пользователь, 200 или 401                                 |
+| GET       | `/api/v1/settings/options` | Публичный каталог валют и IANA timezone из ICU закреплённого Node |
+| GET/PATCH | `/api/v1/settings`         | Только собственный профиль                                        |
+
+Сессия — HS256 JWT (`sub`, `iat`, `exp`, issuer `finora`, audience `finora-web`),
+TTL **24 часа**. Cookie `finora_session`: HttpOnly, SameSite=Strict, Path=/,
+без Domain; Secure включён по умолчанию в API, для локального HTTP Compose
+явно выключен. JWT никогда не доступен React/localStorage. Logout очищает
+cookie текущего браузера; ранее скопированный JWT действителен до `exp`.
+Refresh tokens, server-side revoke и завершение всех устройств не реализуются.
+
+`AUTH_SECRET` обязателен (от 32 байт); значение в Compose/.env.example — только
+публичный локальный demo secret. Для HTTPS production задайте собственный секрет,
+`AUTH_COOKIE_SECURE=true` и точный HTTPS origin в `AUTH_ORIGINS`.
+`AUTH_ORIGINS` — список через запятую, без путей, завершающих `/` и wildcard.
+Compose defaults учитывают WEB_PORT и localhost/127.0.0.1; dev Vite использует
+`http://127.0.0.1:5173` из `.env.example`. Origin обязателен на всех изменяющих
+запросах, включая login/register/logout; API-клиенты и тесты передают его явно.
+Same-origin Swagger работает через Nginx. CORS разрешает credentials только
+точному allowlist; access token в заголовке Authorization не используется.
+
+Login: **10 запросов за 60 секунд на IP**. Register: **5 запросов за час на IP**.
+Учитываются успешные и неуспешные запросы; 429 возвращает Problem Details и
+`Retry-After` в секундах. Лимиты действуют также на варианты регистра пути и
+завершающий `/`. Локальный limiter хранит до 10 000 активных IP/endpoint buckets,
+при заполнении отклоняет новые; restart API обнуляет лимиты. Redis не требуется
+для одного процесса. `AUTH_TRUST_PROXY=true` допустим только в закрытой топологии
+Compose: API не публикуется наружу, Nginx заменяет X-Forwarded-For адресом клиента.
+При прямой локальной разработке trust proxy выключен.
+
+JSON request body ограничен 16 KiB. Неизвестные поля (включая userId, связи и
+служебные значения) отклоняются. Ошибки полей русские, внутренние SQL/Prisma,
+пароли и cookie наружу и в HTTP logs не попадают. Ответы API имеют `no-store`.
+При смене владельца/logout отменяются запросы, удаляются пользовательские
+queries/mutations, текущее значение сессии заменяется через `/auth/me`-контекст.
+
+`pnpm test:e2e:auth` запускает всю прежнюю Docker acceptance, затем Chromium
+проверяет auth/settings через production Nginx и настоящую PostgreSQL. Этому
+расширенному режиму нужны host pnpm/dependencies и Chromium. Обычный
+`pnpm test:docker` по-прежнему требует только Node/Git/Docker на хосте.
+Оба режима используют свои чистые копии, контейнеры и volumes с cleanup.
 
 ## Разработка вне Docker
 
@@ -134,6 +190,7 @@ pnpm typecheck
 pnpm test
 pnpm --filter @finora/web exec playwright install chromium
 pnpm test:e2e
+pnpm test:e2e:auth
 pnpm build
 pnpm db:validate
 pnpm api:check
@@ -174,17 +231,19 @@ PROJECT/DISCOVERY/AI_RULES исключены из автоматическог�
 
 GitHub Actions имеет два jobs. Первый использует PostgreSQL service и выполняет
 frozen install, schema validation, lint, format, strict typecheck, smoke/integration,
-build, Playwright/axe UI smoke и проверку OpenAPI generation. Второй выполняет clean/repeated Docker acceptance,
+build, Playwright/axe UI smoke, проверку OpenAPI generation и auth E2E через Compose/Nginx. Второй выполняет clean/repeated Docker acceptance,
 включая build обоих images. Тестовые данные воспроизводимы, developer machine не нужна.
 
-**Remote GitHub Actions: pending verification after commit/push.**
+**По данным пользователя, исходный `main` прошёл GitHub Actions.** Изменения
+Stage 4 проверяются локальным эквивалентом CI; commit/push и remote-run этой
+рабочей версии не выполнялись.
 
 ## UI foundation
 
 Tokens, composition, breakpoints и доступность описаны в [apps/web/README.md](apps/web/README.md).
 При `pnpm dev:web` ссылка «Компоненты интерфейса» открывает dev-only витрину
 `/design-system`; в production витрина не доступна. Формы в витрине не отправляют
-данные. Stage 3 не подключает financial seed к UI.
+данные. Финансовый seed пока не подключён к предметным экранам.
 
 ## Документация
 

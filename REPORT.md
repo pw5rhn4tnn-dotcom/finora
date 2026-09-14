@@ -704,3 +704,184 @@ PROJECT.md, DISCOVERY.md и AI_RULES.md не изменены. Remote GitHub Act
 исправлением не запускался: commit и push запрещены пользователем.
 
 Предлагаемый commit: `fix(ci): исправить восстановление PostgreSQL в acceptance`.
+
+## 2026-09-14 — Stage 4: Authentication & User Isolation
+
+Использован Codex desktop, shell и Browser skill для визуальной проверки.
+Субагенты не использовались. Задача выполнена в исходном рабочем дереве `main`,
+которое до начала было чистым. По сообщению пользователя исходный main зелёный
+после отдельного CI-fix; новый remote-run не выполнялся, commit/push запрещены.
+
+Фрагмент реального prompt:
+
+> Теперь необходимо выполнить ТОЛЬКО Stage 4 согласно зафиксированному roadmap проекта.
+> Не ослабляй существующие тесты, CI, accessibility и acceptance checks.
+
+Prompt задал проверяемую границу: auth, профиль и изоляция; финансовые placeholders
+не превращались в CRUD/dashboard. Перед кодом изучены AI_RULES, PROJECT, DISCOVERY,
+ROADMAP, ARCHITECTURE, README, REPORT, frontend README и фактическая реализация
+schema/constraints/seed, health/Swagger/Orval, shell/providers/primitives и CI.
+Утилита rg недоступна, использованы find/sed/grep. Старые фразы «auth ещё нет»
+оказались описанием предыдущего этапа, а не архитектурным запретом; блокирующих
+противоречий источников не обнаружено.
+
+### Аудит и реализация
+
+Stage 1–3 подготовили User/Category/AuditEntry, lower(email) unique index, составные
+ownership FK, runtime permissions для audit, deterministic demo hashes, Orval,
+Query provider и UI primitives. Новая schema/migration не нужна: baseline и все
+DB constraints неизменны. Из seed вынесен только каталог стандартных категорий для
+повторного использования; re-export сохраняет прежний API и dataset.
+
+AuthModule/UsersModule встроены в NestJS. Global AuthGuard закрывает обработчики
+по умолчанию, Public отмечает точные исключения; user берётся из проверенной
+JWT-cookie и реальной записи БД. Register создаёт пользователя, 8 категорий и
+8 category CREATE snapshots в общей транзакции. AuditWriter не открывает свою
+транзакцию. Ошибка после нескольких audit writes откатывает все изменения.
+Email нормализуется trim/lowercase; concurrent duplicate переводится из P2002 в
+безопасный 409. Профиль возвращает только разрешённые поля без password/hash.
+
+Argon2id через async Node crypto: memory 65536 KiB, passes 3, parallelism 1,
+32-byte hash, случайная 16-byte соль; существующие seed hashes совместимы.
+Несуществующий email проверяется с dummy hash той же стоимости, ошибка login
+одинакова для неизвестного email и неверного пароля.
+JWT через jose: HS256, issuer finora, audience finora-web, обязательные sub/iat/exp,
+TTL 86400 секунд. Cookie finora_session — HttpOnly, SameSite=Strict, Path=/,
+без Domain. Secure включён по умолчанию API; локальный HTTP Compose явно задаёт
+false. AUTH_SECRET обязателен от 32 байт, demo default опубликован только как
+локальный. Logout удаляет cookie с теми же атрибутами, в том числе после expiry;
+скопированный ранее JWT действует до exp, revoke/refresh/session table не добавлены.
+
+Origin точный и обязательный для всех mutations, включая login/register/logout.
+CORS credentials только для allowlist. Nginx заменяет X-Forwarded-For, API не имеет
+публичного порта; trust proxy включён только для этой топологии. Login ограничен
+10 запросами/60 секунд/IP, register 5/час/IP, ответы 429 включают Retry-After.
+Limiter локальный, до 10 000 активных buckets, очищает истёкшие; restart его сбрасывает.
+Лимит привязан к metadata обработчика, а не написанию URL. JSON body ≤16 KiB.
+Zod boundary отклоняет неизвестные/служебные поля, invalid types, currency/timezone,
+некорректный email и длины. ProblemFilter сохраняет единый русский контракт для
+400/401/403/404/409/413/429/500, parser errors не раскрывают тело запроса. Trace ID и
+no-store устанавливаются до JSON parser; прежняя redaction внутренних ошибок сохранена.
+
+UsersService меняет только displayName/baseCurrency/timeZone текущего владельца.
+Смена валюты использует FOR UPDATE пользователя и EXISTS по transactions, budgets,
+recurring rules (включая archived) и финансовому audit удалённых данных.
+Проверены маленькая и предельная Decimal fixture без преобразования в float.
+Категории не блокируют смену валюты. Timezone меняется без сдвига business dates.
+Будущие financial writers обязаны брать ту же блокировку пользователя; Stage 5
+не реализован. Профиль не принимает чужие ID/связи или themePreference.
+
+Swagger/OpenAPI экспортирует 7 auth/settings операций, DTO, ограничения,
+additionalProperties:false входных объектов, cookie security и Problem responses.
+Orval client регенерирован штатно, api:check воспроизводим. Frontend использует
+только тонкий typed adapter над generated Fetch functions, без ручных URL/fetch.
+Новые exact dependencies: jose 6.2.12, zod 4.6.4, react-hook-form 7.88.0,
+@types/express 5.0.6; web подключает workspace api-client. Прежние direct versions
+не обновлены. Первый npm download упёрся в sandbox DNS, разрешённый повтор успешен.
+Web Dockerfile теперь копирует source api-client, необходимый реальному потребителю.
+
+### Frontend, состояния и доступность
+
+Публичные login/register, auth boundary для product routes, реальные demo-кнопки,
+logout и settings используют Stage 3 Card/Input/Select/Button/states/tokens.
+React Hook Form + Zod проверяют поля до отправки, server field errors отображаются
+с label/aria-describedby/aria-invalid. Каталоги валют и IANA timezone читаются через
+Query из ICU закреплённого Node, без внешнего API; при ошибке есть retry и submit
+заблокирован. User state приходит через auth/me, mutations не повторяются автоматически.
+
+Обработаны initial loading, anonymous, initial error/retry, background loading/error
+с сохранением черновика, validation, pending, server conflict, success и 401/expiry.
+Пустые обязательные поля получают validation; отдельного пустого финансового списка
+Stage 4 не требует, overview остаётся честным предварительным экраном.
+При logout/смене владельца запросы отменяются, пользовательские queries/mutations
+удаляются, значение текущей сессии заменяется с сохранением observer. Pending
+профиля блокирует logout; поздний ответ прежнего пользователя не меняет новую сессию.
+
+Проверены 320/390/768/1440/1920px и 640×320 landscape для новых форм; прежний suite
+дополнительно сохраняет 767/1024px. Длинные имя/email и 200% root font не создают
+horizontal overflow. Нативные Select доступны на mobile, функциональность не скрыта.
+Keyboard login, focus первого ошибочного поля, focus main после auth и visible focus
+проверены браузером. Прежние Sheet trap/Escape/возврат focus, skip link, responsive
+navigation, safe-area и reduced motion сохранены. Axe WCAG 2/2.1/2.2 A/AA — ноль
+violations во всех проверенных состояниях. Физические устройства и screen reader
+отдельно не тестировались.
+
+Через Browser просмотрены реальный login desktop, register 320px и settings
+1440/390px с demo-профилем. Консоль вкладки не содержит warning/error. Full-page
+снимок Browser один раз показывал промежуточную сжатую геометрию после viewport
+change; фактическая DOM geometry и стабильный viewport screenshot подтвердили
+корректный layout. Дополнительное доказательство — реальный Chromium reflow suite.
+Временная вкладка закрыта, viewport override сброшен.
+
+### Self-review и исправления
+
+- Clear всего QueryClient разрывал observer сессии: теперь очищаются все остальные
+  queries/mutations, а сама сессия заменяется атомарно; добавлена регрессия logout/login.
+- Конкурирующие imperative navigate и Navigate убирали success notice/focus после
+  auth: оставлен один декларативный переход, Playwright проверяет focus main.
+- Validation focus срабатывал до снятия disabled: hook переводит его после pending
+  в первое ошибочное поле по DOM-порядку, включая серверные field errors.
+- Сравнение точного path в limiter допускало обход trailing slash/case: заменено
+  metadata и проверено HTTP aliases плюс spoofed X-Forwarded-For через Nginx.
+- У web Docker build не было нового api-client source: добавлен необходимый COPY.
+- Фоновая ошибка auth/me теряла черновик: сохраняются форма и cached user с retry;
+  401 отдельно очищает сессию. Pending save/logout и поздний ответ другого владельца
+  проверены отдельной компонентной регрессией.
+- Визуальная проверка выявила отсутствие внутренних отступов новой profile Card:
+  добавлены token spacing и существующая typography utility.
+- Уточнены русские сообщения Zod для invalid types, additionalProperties OpenAPI,
+  запрещены control characters в имени, trace/no-store перенесены перед body parser.
+
+Отдельно просмотрены diff и новые модули на scope creep, дубли primitives/API,
+unsafe casts/any, monetary/date arithmetic, N+1, race/cache, ownership и секреты.
+Финансового CRUD, лишних API, mock production data и debug-панелей не добавлено.
+
+### Финальные проверки
+
+Локальная среда: Node 24.21.0, pnpm 12.4.1, macOS; PostgreSQL 17.6 в отдельном
+контейнере. Foundation команды выполнены с CI=true, Linux runtime проверен Docker.
+
+| Проверка                                | Результат                                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| pnpm install --frozen-lockfile          | Успех, exact lockfile актуален                                                                                |
+| pnpm db:validate                        | Успех, schema неизменна                                                                                       |
+| pnpm lint                               | Успех, zero warnings                                                                                          |
+| pnpm format:check                       | Успех                                                                                                         |
+| pnpm typecheck                          | Успех, все 3 packages, strict сохранён                                                                        |
+| pnpm test: frontend                     | 31 passed: 19 прежних + 12 новых                                                                              |
+| pnpm test: backend                      | 29 passed по node:test: 13 новых auth + 13 прежних PostgreSQL + HTTP smoke + 2 parent tests; 0 skipped/failed |
+| pnpm build                              | Nest и production Web собраны; JS 480.33 kB / gzip 149.86 kB, CSS 34.44 kB                                    |
+| playwright install --with-deps chromium | Успех, команда из CI                                                                                          |
+| pnpm test:e2e                           | 15 passed, прежние assertions сохранены                                                                       |
+| pnpm api:check                          | Успех, OpenAPI/Orval воспроизводимы                                                                           |
+| pnpm test:e2e:auth                      | Успех: полный Docker acceptance + 11 passed через production Nginx, без retries                               |
+| git diff --check                        | Успех                                                                                                         |
+
+13 новых backend scenarios покрывают register/categories/audit/me, random Argon2 salts,
+concurrent email, rollback audit, seed login/generic errors, malformed/expired/wrong JWT,
+Origin/CORS, payload limits/validation, ownership, currency fixtures, concurrent DB lock,
+rate limits/aliases и logout/Secure. 12 новых frontend tests покрывают состояния форм,
+cache, pending, validation, retry, profile updates, expiry и late-response race.
+11 новых E2E включают registration/profile/reload/logout/login, demo isolation,
+ошибки сети/пароля/сессии, 6 responsive/axe вариантов, keyboard/pending и Nginx security.
+До финального Nginx прогона 10 auth E2E отдельно прошли на dev API для диагностики;
+они не выдаются за Compose acceptance.
+
+Docker mode --browser сначала выполнил все прежние assertions: чистая копия без
+node_modules/.env, оба builds, 3 healthy services, Swagger/deep links, 288 transactions,
+seed ×3, hash всех таблиц, PostgreSQL outage и readiness 200 → 503 → 200 при liveness 200,
+down/up с тем же volume. Hash до изменяющих browser tests остался
+55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0.
+Затем прошли 11 auth tests; finally удалил своё окружение и volume.
+Обычный Docker runner без --browser не требует host pnpm, как и прежде.
+CI foundation получил дополнительную browser Compose проверку; timeout увеличен
+с 20 до 25 минут под дополнительный build, ни одна проверка не удалена/ослаблена.
+
+Stage 4 полностью завершён локально, Stage 5 не начинался. Не реализованы financial
+CRUD, analytics/dashboard, budgets UI, recurring scheduler, CSV, audit reader/UI,
+roles/admin, shared workspace, refresh/reset/verification и dark mode.
+Обновлены ROADMAP, REPORT, README, ARCHITECTURE и apps/web/README.
+PROJECT, DISCOVERY, AI_RULES, Prisma schema и baseline сохранены без изменений.
+Commit/push, force и history rewrite не выполнялись.
+
+Предлагаемый commit: feat(auth): добавить авторизацию и изоляцию пользователей Finora

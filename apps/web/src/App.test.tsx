@@ -1,3 +1,7 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './features/auth/AuthProvider';
+import { sessionKey } from './features/auth/auth-context';
+import { testUser } from './test/fixtures';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -5,10 +9,18 @@ import { expect, test } from 'vitest';
 import { App } from './App';
 
 function mount(path = '/') {
+  const client = new QueryClient({
+    defaultOptions: { queries: { enabled: false } },
+  });
+  client.setQueryData(sessionKey, testUser);
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 

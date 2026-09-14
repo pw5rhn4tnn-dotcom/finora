@@ -1,0 +1,74 @@
+.auth-page {
+  width: 100%;
+  min-height: 100dvh;
+  max-width: 36rem;
+  margin-inline: auto;
+  padding: calc(var(--spacing) * 6) calc(var(--spacing) * 4);
+  padding-bottom: max(calc(var(--spacing) * 6), env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 6);
+  overflow-wrap: anywhere;
+}
+.auth-card,
+.profile-card {
+  display: grid;
+  gap: calc(var(--spacing) * 6);
+  min-width: 0;
+}
+.auth-card,
+.profile-card {
+  padding: calc(var(--spacing) * 6);
+}
+.account-form {
+  display: grid;
+  gap: calc(var(--spacing) * 5);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.account-form > *,
+.account-form .field {
+  min-width: 0;
+}
+.demo-access {
+  display: grid;
+  gap: calc(var(--spacing) * 4);
+  border-top: 1px solid var(--color-border);
+  padding-top: calc(var(--spacing) * 5);
+}
+.demo-access h2 {
+  font-size: var(--text-section);
+}
+.demo-access p,
+.profile-email {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.demo-access > div {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+}
+.session-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.session-name {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1;
+}
+.profile-card {
+  max-width: 44rem;
+}
+
+.session-feedback {
+  padding: calc(var(--spacing) * 4);
+  display: grid;
+  gap: calc(var(--spacing) * 3);
+}

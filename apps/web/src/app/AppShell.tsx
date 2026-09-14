@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
-import { Badge } from '../shared/ui/Surface';
+import {
+  SessionControls,
+  SessionFeedback,
+} from '../features/auth/SessionControls';
 import { Brand } from './Brand';
 import { MobileNavigation, Sidebar } from './Navigation';
 import { navigation } from './navigation-config';
@@ -18,12 +21,12 @@ export function AppShell() {
           ? 'Компоненты интерфейса'
           : 'Страница не найдена');
     document.title = `${title} — Finora`;
-    if (previousPath.current !== location.pathname) {
+    if (previousPath.current !== location.pathname || location.state) {
       document.getElementById('main-content')?.focus();
       window.scrollTo({ top: 0, behavior: 'instant' });
       previousPath.current = location.pathname;
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.state]);
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -36,9 +39,10 @@ export function AppShell() {
             <Brand />
           </div>
           <p className="topbar__desktop-label">Личное пространство</p>
-          <Badge tone="primary">Предварительный просмотр</Badge>
+          <SessionControls />
         </header>
         <main id="main-content" tabIndex={-1}>
+          <SessionFeedback />
           <Outlet />
         </main>
         <footer className="shell-footer">

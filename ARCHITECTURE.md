@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1–2 и frontend foundation Stage 3. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Предметные функции Stage 4+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–4. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже; фактическая приёмка — в REPORT. Финансовые функции Stage 5+ остаются планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -404,7 +404,7 @@ Compose по умолчанию — локальная учебная демон
 
 GitHub Actions постепенно реализует обязательный pipeline: установка из lockfile → lint → проверка форматирования → typecheck → tests → build → проверка Docker build. Сборка Docker обязательна для принятого scope Discovery, хотя в общих требованиях задания отдельно названа опциональной. Unit/integration используют настоящую PostgreSQL service с миграциями; frontend build проверяет генерируемый API-клиент.
 
-Foundation даёт install/lint/format/typecheck/tests/build; Stage 2 добавил PostgreSQL service, интеграционные тесты на отдельных временных БД, schema validation, проверку генерации контрактов и отдельный job Docker clean/repeated startup. Следующие этапы расширяют реальные тесты. Remote GitHub Actions остаётся pending verification after commit/push. Playwright может выполняться отдельным job с поднятым Compose и ожиданием readiness, если это упрощает время выполнения и диагностику; сам smoke suite обязателен к финалу. Отчеты падений и E2E artifacts не должны содержать секреты.
+Foundation даёт install/lint/format/typecheck/tests/build; Stage 2 добавил PostgreSQL service, интеграционные тесты на отдельных временных БД, schema validation, проверку генерации контрактов и отдельный job Docker clean/repeated startup. Следующие этапы расширяют реальные тесты. По данным пользователя исходный main зелёный; изменения Stage 4 до commit/push проверяются локально. Playwright может выполняться отдельным job с поднятым Compose и ожиданием readiness, если это упрощает время выполнения и диагностику; сам smoke suite обязателен к финалу. Отчеты падений и E2E artifacts не должны содержать секреты.
 
 Адекватная Git history обязательна: архитектурная документация должна попасть в commit до application code, затем каждый законченный шаг оформляется логически. Preflight Stage 1 подтвердил существующий Git-репозиторий и отдельный commit документации `bb3ff1a` до первого application code. Remote `origin` связан с GitHub. Агент не выполняет commit самовольно. Финальная сдача включает GitHub-репозиторий и успешный CI.
 
@@ -445,3 +445,41 @@ Foundation даёт install/lint/format/typecheck/tests/build; Stage 2 доба�
 | Объем функций вытесняет качество UI | Границы roadmap, небольшие законченные изменения, необязательные функции откладываются первыми    | Поэтапная приемка и demo, Stage 3–12                          |
 
 Ни один риск не снимает обязательных требований. Обнаруженное несоответствие фиксируется до дальнейшей реализации затронутой части.
+
+## 28. Реализованный Stage 4 — Authentication & User Isolation
+
+AuthModule и UsersModule добавлены к HealthModule без замены модульного монолита.
+Глобальный AuthGuard закрывает каждый новый controller по умолчанию; явные Public
+исключения: health, register/login/logout и каталог settings/options. Authentication
+context содержит проверенного существующего пользователя; settings не принимает
+ID владельца. Origin guard применяется ко всем изменяющим обработчикам. Rate limit
+привязан к metadata обработчика, поэтому регистр/завершающий slash пути его не обходят.
+Nginx заменяет X-Forwarded-For; trust proxy включён только для этой закрытой топологии.
+
+Argon2id использует async Node crypto (64 MiB, 3 прохода, parallelism 1, hash 32 байта,
+случайная соль 16 байт); совместим с уже созданными demo hashes. JWT проверяется jose
+с явными HS256/issuer/audience/sub/iat/exp и TTL 86400 секунд. Конфигурация, cookie,
+лимиты 10/min и 5/hour, HTTP demo/HTTPS production и stateless logout описаны в README.
+Новых схем, таблиц и migrations не потребовалось; baseline неизменна.
+
+Стандартные категории выделены из seed в повторно используемый локальный каталог.
+Seed import/re-export сохраняет его API, данные и hash. AuthService создаёт пользователя,
+8 категорий и audit в одной Prisma transaction; AuditWriter получает тот же клиент и
+записывает только разрешённые поля категории. Финансового CRUD и audit read API нет.
+UsersService под FOR UPDATE строки пользователя проверяет EXISTS операций, бюджетов,
+всех recurring rules и финансового audit, затем разрешает/отклоняет смену валюты.
+Stage 5+ financial writers должны использовать ту же блокировку; тест уже проверяет
+конкурирующую DB fixture. Monetary Decimal и business dates не меняются.
+
+Swagger/OpenAPI теперь содержит auth/settings DTO, cookie security, русские описания,
+ошибки, ограничения полей и запрет additionalProperties во входных DTO. Orval Fetch
+client регенерируется штатной командой; frontend использует тонкий адаптер над ним.
+React Hook Form/Zod, AuthProvider и TanStack Query дополняют Stage 3 shell. Состояния,
+очистка кэша и focus описаны в apps/web/README.md. Старые абзацы о frontend foundation
+Stage 3 описывают именно завершённый foundation; ограничения отсутствия auth к
+текущему Stage 4 уже не относятся.
+
+CI foundation дополнен `pnpm test:e2e:auth`: прежний Docker runner в режиме --browser
+сначала проверяет полный seed/restart/readiness, затем запускает auth Playwright через
+Nginx; обычный Docker job и все старые assertions сохранены. Web Dockerfile копирует
+исходники api-client, поскольку теперь имеет реального workspace-потребителя.

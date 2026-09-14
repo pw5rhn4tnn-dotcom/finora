@@ -11,7 +11,7 @@ jobs:
   foundation:
     name: Foundation и PostgreSQL
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17.6-bookworm
@@ -58,6 +58,8 @@ jobs:
         run: pnpm test:e2e
       - name: Проверить воспроизводимость OpenAPI-клиента
         run: pnpm api:check
+      - name: Проверить auth через Nginx и PostgreSQL в браузере
+        run: pnpm test:e2e:auth
   docker:
     name: Чистый и повторный Docker startup
     runs-on: ubuntu-latest

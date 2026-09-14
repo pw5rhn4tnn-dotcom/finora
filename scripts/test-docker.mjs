@@ -187,6 +187,22 @@ try {
   await compose('up', '-d', '--wait', '--wait-timeout', '180');
   await verifyHttp();
   assert.equal(await databaseHash(), before);
+  if (process.argv.includes('--browser')) {
+    // Сначала сохранены все прежние проверки dataset/readiness/restart.
+    const browserUrl = `http://${(await compose('port', 'web', '80')).trim()}`;
+    env.AUTH_ORIGINS = browserUrl;
+    await compose('up', '-d', '--wait', '--wait-timeout', '180', 'api');
+    const result = await exec(
+      'pnpm',
+      ['--filter', '@finora/web', 'exec', 'playwright', 'test'],
+      {
+        env: { ...process.env, FINORA_COMPOSE_URL: browserUrl },
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: 300000,
+      },
+    );
+    console.log(result.stdout);
+  }
   console.log(
     `PASS: clean/repeated startup, seed ×3, DB outage/recovery; dataset SHA-256 ${before}`,
   );

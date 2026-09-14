@@ -1,3 +1,4 @@
+import { Public } from '../modules/auth/auth.guard.js';
 import {
   Controller,
   Get,
@@ -24,6 +25,7 @@ class HealthDto {
 
 @ApiTags('Инфраструктура')
 @ApiExtraModels(ProblemDto)
+@Public()
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
