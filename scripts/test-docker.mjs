@@ -7,6 +7,7 @@ import {
   recurringAcceptance,
   recurringOutageAcceptance,
 } from './recurring-acceptance.mjs';
+import { auditAcceptance } from './audit-acceptance.mjs';
 import { securityCompose } from './security-compose.mjs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -208,6 +209,7 @@ try {
   await recurringAcceptance(financeUrl, compose, databaseHash);
   await recurringOutageAcceptance(financeUrl, compose, env);
   await csvAcceptance(financeUrl, compose, databaseHash);
+  await auditAcceptance(financeUrl, compose, databaseHash);
   if (process.argv.includes('--browser')) {
     const resultsRoot = resolve('apps/web/test-results');
     await mkdir(resultsRoot, { recursive: true });

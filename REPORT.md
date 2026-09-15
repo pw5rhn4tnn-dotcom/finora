@@ -2873,3 +2873,180 @@ checkout; Linux x86_64 remote CI для этого HEAD не запускалс�
 Stage 10 не начат. До нового зелёного remote GitHub Actions run на Linux
 x86_64 для итогового Stage 9 commit итоговый статус — `STAGE 9 LOCAL
 VALIDATION COMPLETE — REMOTE CI GATE PENDING`, не `FINAL COMPLETE`.
+
+### 15.09.2026 — commit и подтверждение remote CI
+
+Stage 9 закоммичен в отдельной сессии (`ee14e14`, поверх `e9d695b`) — оба
+коммита присутствуют в git-истории на начало Stage 10. Пользователь
+подтвердил в задании на Stage 10, что Stage 9 «уже прошёл локальные проверки
+и remote GitHub Actions»; отдельной записи с деталями конкретного remote run
+в этом файле по-прежнему нет, и эта сессия не запускала remote CI и не может
+её воспроизвести задним числом. Фиксируется минимально: **STAGE 9 FINAL
+COMPLETE — LOCAL + REMOTE CI GREEN.** История Stage 9 выше не переписывается.
+
+## 15.09.2026 — Stage 10: журнал изменений (Audit Log)
+
+Исходная точка: `git status --short` в начале сессии — чисто; HEAD `ee14e14`
+(Stage 9 CSV, см. запись выше). До реализации прочитаны AI_RULES.md целиком,
+раздел Stage 10 ROADMAP.md, связанные части DISCOVERY.md (§6 Audit Log, §7
+Audit business rules, §33.4 Rich Audit Diff, §34 excluded features, §32
+nice-to-have — «улучшенные audit filters» вне обязательного scope) и
+ARCHITECTURE.md §16 (Аудит) вместе с существующей реализацией: `AuditWriter`
+(`modules/audit/audit.module.ts`) уже пишет `CREATE/UPDATE/DELETE/ARCHIVE` с
+Stage 4 для всех четырёх сущностей в одной DB transaction с доменной
+мутацией; читающего API не было. DB-level immutability (`SELECT, INSERT`-only
+runtime права на `audit_entries`, `scripts/grant-runtime.mjs`) и snapshot-
+инварианты (`CREATE` — только `after`, `DELETE` — только `before`) уже
+существовали и уже покрыты `database.test.ts` (Stage 4) — Stage 10 их не
+трогал, только добавил API-уровня проверку (нет мутирующих методов).
+
+### Scope
+
+**Входит (реализовано):** `GET /audit-log` — единственный новый endpoint,
+read-only, фильтры `entityType/entityId/action/dateFrom/dateTo`, пагинация,
+newest-first сортировка с id tie-break, строго `userId` из auth context;
+frontend `/audit-log` (ранее `PlaceholderPage`) — список, фильтры, читаемый
+before/after diff (`AuditDiff`), loading/empty/error/retry, responsive,
+keyboard focus-restore; полнота аудита проверена для всех четырёх сущностей
+и всех применимых действий, включая каскадный `ARCHIVE` категории →
+активное recurring-правило; подтверждено, что удаление операции и
+последующее переименование её категории не разрушают уже прочитанную
+историю.
+
+**Не входит (сознательно, по ROADMAP):** запись аудита с нуля (уже есть с
+Stage 4), выдуманная ретроистория, update/delete audit пользователем,
+event sourcing, администрирование, расширенные/улучшенные фильтры (текстовый
+поиск, сохранённые представления — DISCOVERY §32 nice-to-have). Отдельный
+`GET /audit-log/:id` не создавался: `before/after` уже входят в каждый
+элемент списка (см. ARCHITECTURE §33) — второй round-trip не добавил бы
+информации, только N+1-подобный дополнительный запрос на «просмотр деталей».
+
+**Затронутые контракты:** новый OpenAPI endpoint и Orval-типы
+(`AuditEntryDto`, `AuditPageDto`, `AuditListParams`); существующие
+контракты (`Transaction/Budget/Category/RecurringTransaction` API,
+`AuditWriter`) не менялись.
+
+### Ключевые решения
+
+- **Без join к живым таблицам.** Сервис читает `audit_entries` только по
+  `userId`; `entityId`/`entityType` не разрешаются в текущее состояние
+  сущности. Это единственный способ гарантировать требование ROADMAP
+  «удаление сущности и переименование категории не разрушают историю» без
+  дублирования данных и без риска рассинхронизации при будущих изменениях
+  доменных таблиц.
+- **`entityId` как фильтр.** Не заявлен явно в ROADMAP, но покрыт уже
+  существующим с Stage 4 составным индексом `(userId, entityType,
+entityId)` — без него этот индекс не использовался бы ни одним запросом
+  приложения. Отнесён к «базовым фильтрам» (ROADMAP), а не к «улучшенным»
+  (DISCOVERY §32 nice-to-have), так как оперирует полем самой таблицы
+  audit_entries, а не текстовым поиском/сохранёнными представлениями.
+- **Список = детали, без отдельного GET.** `before/after` — небольшой
+  фиксированный JSON, уже присутствующий в каждом элементе списка; «список
+  и детали» из ROADMAP реализованы как одна страница с раскрывающимся
+  диалогом, а не как два API-round-trip на один и тот же уже полученный
+  снимок.
+- **Date-фильтр по календарным суткам UTC.** `createdAt` — момент события
+  (системная временная метка), а не business date, поэтому `dateFrom/dateTo`
+  сравниваются как литеральные календарные границы в UTC, тем же способом,
+  каким остальной проект уже трактует все даты (без сдвига под IANA
+  timeZone владельца — ARCHITECTURE §14). Отображение (`dateTimeText`)
+  осознанно отличается: конкретный момент показывается в локальном времени
+  владельца, потому что для человека-читателя «когда это произошло» важнее
+  показать в его времени, чем для фильтра — важна детерминированная граница.
+- **Не создавался отдельный `.compose.spec.ts`.** ROADMAP явно допускает
+  это как необязательное после обязательного smoke suite. Golden path
+  (список → фильтры → detail diff → responsive → focus-restore → console
+  errors) проверен вручную в реальном браузере поверх `dev:api`/`dev:web`
+  (см. ниже). Вместо Playwright добавлен `scripts/audit-acceptance.mjs`,
+  включённый в `test-docker.mjs` по контракту существующих
+  `*-acceptance.mjs` — тот же уровень доказательства для Docker
+  clean-runner gate, что у Stage 6/9.
+
+### Concurrency / stress
+
+Stage 10 не добавляет concurrency, scheduler, cache или async coordination:
+единственная новая операция — `SELECT` в рамках одной короткой read-only
+транзакции (`isolationLevel: RepeatableRead`, тот же паттерн, что список
+транзакций). Гонок читатель-читатель не существует; гонка читатель-писатель
+невозможна, так как писатель (`AuditWriter`) — та же атомарная операция,
+что и раньше, без изменений. Отдельный 20-run stress test не делался —
+он был бы избыточен для чистого чтения без разделяемого мутируемого
+состояния между вызовами.
+
+### Тесты
+
+Backend (`apps/api/test/audit.test.ts`, 10 новых, интеграционные, реальная
+PostgreSQL): ownership isolation (чужой `entityId` → `total=0`, при этом
+чужая сессия с тем же `entityId` видит свою запись); фильтры
+`entityType`/`action` и детерминированный newest-first порядок; 400 Problem
+Details на некорректные `entityType/action/dateTo<dateFrom/неизвестный
+параметр`; отсутствие `POST/PATCH/DELETE` (404); полнота
+`CREATE/UPDATE/DELETE` для Transaction/Budget/RecurringTransaction (hard
+delete) с проверкой формы `before/after` по каждому действию; `ARCHIVE`
+Category и каскадный `ARCHIVE` связанного активного RecurringTransaction;
+история переживает удаление операции и последующее переименование её
+категории (снимок не пересчитывается задним числом). DB-level immutability
+и snapshot-инварианты не дублировались новыми тестами — они уже покрыты
+`database.test.ts` с Stage 4.
+
+Frontend (`apps/web/src/features/finance/audit.test.tsx`, 6 новых,
+Testing Library): список показывает тип/действие/время без raw JSON;
+пустой список; ошибка списка → retry; detail UPDATE показывает только
+реально изменившиеся поля (`Категория` не рендерится диффом, так как не
+менялась); detail CREATE показывает только «после», без стрелки; смена
+фильтров меняет query-параметры запроса.
+
+Ручная проверка в реальном браузере (Chrome-based preview поверх локального
+`dev:api`/`dev:web` и demo-датасета): список с реальными seed-записями,
+фильтр `Действие=Изменение` → диалог показывает единственную изменившуюся
+строку «Следующая операция: 12.09.2026 → 12.10.2026» (advance recurring
+rule) без остальных полей; фильтр `Тип сущности=Категории` +
+`Действие=Архивирование` → корректный EmptyState с кнопкой сброса (в demo
+dataset такой комбинации не оказалось — ожидаемо, не дефект); mobile-
+viewport (375×812) — фильтры и список корректно стекируются; Escape
+закрывает detail-диалог и возвращает фокус на исходную кнопку «Подробнее»;
+консоль браузера — без ошибок.
+
+### Найденные и исправленные дефекты
+
+1. Первая версия последнего интеграционного теста ошибочно ожидала, что
+   snapshot `ARCHIVE` категории после её переименования сохранит СТАРОЕ имя
+   — неверная посылка (snapshot корректно отражает состояние на момент
+   архивирования, то есть уже переименованное). Тест переписан на прямую
+   проверку требования ROADMAP: удалить операцию, затем переименовать
+   категорию, затем убедиться, что снимки этой операции не изменились
+   задним числом. Дефекта в реализации не было — дефект был в тесте.
+2. Query-параметр `pageSize=1` в раннем черновике теста не проходил
+   собственную validation (enum `10|25|50`) — исправлено на `pageSize=10`.
+
+### Итоговая таблица локальных проверок
+
+| Проверка                                           | Результат                                                                                       |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Backend tests                                      | PASS (137/137, включая 10 новых Stage 10)                                                       |
+| Frontend tests                                     | PASS (97/97, включая 6 новых Stage 10)                                                          |
+| Ownership isolation (audit)                        | PASS                                                                                            |
+| Immutability (API + DB, Stage 4 повторно)          | PASS                                                                                            |
+| Полнота аудита (4 сущности × применимые действия)  | PASS                                                                                            |
+| История переживает delete + rename                 | PASS                                                                                            |
+| lint / format:check / typecheck / build            | PASS                                                                                            |
+| api:check (OpenAPI/Orval drift)                    | PASS                                                                                            |
+| db:validate                                        | PASS                                                                                            |
+| Playwright smoke (`test:e2e`, non-compose)         | PASS (15/15)                                                                                    |
+| Ручная browser-проверка golden path                | PASS                                                                                            |
+| Docker acceptance (`test:docker`, чистый checkout) | PASS, включая новый `audit-acceptance.mjs`; dataset SHA-256 подтверждён после restart           |
+| Concurrency/stress                                 | не применимо — Stage 10 не содержит concurrency (см. выше)                                      |
+| Отдельный `.compose.spec.ts`                       | не добавлялся — допустимо по ROADMAP, заменён ручной browser-проверкой + `audit-acceptance.mjs` |
+| Случайные артефакты в `git status`                 | не найдено — только файлы Stage 10                                                              |
+
+### Итоговый статус
+
+**STAGE 10 LOCAL VALIDATION COMPLETE — REMOTE CI GATE PENDING.** Весь
+обязательный ROADMAP scope Stage 10 реализован: read-only audit API,
+фильтры/пагинация, экран списка и деталей, русский readable diff,
+поддержка всех действий для всех четырёх сущностей, устойчивость истории к
+удалению/переименованию. Ownership и immutability подтверждены на уровне
+API и (повторно) БД. Stage 11 не начат. Commit и push не выполнялись в этой
+сессии — только по отдельному разрешению пользователя. До нового remote
+GitHub Actions run на текущий HEAD итоговый статус — `STAGE 10 LOCAL
+VALIDATION COMPLETE — REMOTE CI GATE PENDING`, не `FINAL COMPLETE`.

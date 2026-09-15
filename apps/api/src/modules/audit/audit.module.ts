@@ -1,5 +1,8 @@
 import { Injectable, Module } from '@nestjs/common';
 import { Prisma, type Category } from '../../generated/prisma/client.js';
+import { PrismaModule } from '../../prisma/prisma.module.js';
+import { AuditController } from './audit.controller.js';
+import { AuditService } from './audit.service.js';
 
 @Injectable()
 export class AuditWriter {
@@ -57,5 +60,10 @@ export class AuditWriter {
     });
   }
 }
-@Module({ providers: [AuditWriter], exports: [AuditWriter] })
+@Module({
+  imports: [PrismaModule],
+  controllers: [AuditController],
+  providers: [AuditWriter, AuditService],
+  exports: [AuditWriter],
+})
 export class AuditModule {}

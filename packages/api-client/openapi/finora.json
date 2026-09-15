@@ -805,6 +805,205 @@
         ]
       }
     },
+    "/api/v1/audit-log": {
+      "get": {
+        "operationId": "auditList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Номер страницы от 1",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9999999,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Размер страницы",
+            "schema": {
+              "default": 25,
+              "type": "number",
+              "enum": [
+                10,
+                25,
+                50
+              ]
+            }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "description": "Тип сущности",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "Transaction",
+                "Budget",
+                "Category",
+                "RecurringTransaction"
+              ]
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "description": "История одной сущности (обычно вместе с entityType)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "Действие",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "CREATE",
+                "UPDATE",
+                "DELETE",
+                "ARCHIVE"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Начальная дата включительно",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Конечная дата включительно",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Read-only список собственных записей аудита с фильтрами и серверной пагинацией",
+        "tags": [
+          "Журнал изменений"
+        ]
+      }
+    },
     "/api/v1/categories": {
       "get": {
         "operationId": "categoriesList",
@@ -4452,6 +4651,95 @@
           "timeZone"
         ],
         "additionalProperties": false
+      },
+      "AuditEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Идентификатор записи аудита",
+            "format": "uuid"
+          },
+          "entityType": {
+            "type": "string",
+            "description": "Тип затронутой сущности",
+            "enum": [
+              "Transaction",
+              "Budget",
+              "Category",
+              "RecurringTransaction"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Идентификатор затронутой сущности; сущность может быть уже удалена",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "description": "Действие",
+            "enum": [
+              "CREATE",
+              "UPDATE",
+              "DELETE",
+              "ARCHIVE"
+            ]
+          },
+          "before": {
+            "type": "object",
+            "description": "Снимок до изменения; отсутствует для CREATE. Раскладка полей зависит от entityType",
+            "nullable": true
+          },
+          "after": {
+            "type": "object",
+            "description": "Снимок после изменения; отсутствует для DELETE",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Момент записи",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "action",
+          "before",
+          "after",
+          "createdAt"
+        ]
+      },
+      "AuditPageDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Номер страницы"
+          },
+          "pageSize": {
+            "type": "number",
+            "description": "Размер страницы"
+          },
+          "total": {
+            "type": "number",
+            "description": "Всего собственных записей после фильтрации"
+          },
+          "items": {
+            "description": "Записи страницы",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
       },
       "CategoryDto": {
         "type": "object",

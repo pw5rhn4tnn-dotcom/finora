@@ -11,6 +11,20 @@ export function moneyText(value: string, currency: string) {
 export function dateText(value: string) {
   return value.split('-').reverse().join('.');
 }
+// createdAt — момент события в UTC (не business date), поэтому в отличие от
+// dateText показывается в локальном времени владельца через IANA timeZone.
+export function dateTimeText(value: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date(value));
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}`;
+}
 export function todayInZone(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,

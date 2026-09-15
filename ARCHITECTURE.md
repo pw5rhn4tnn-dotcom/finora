@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1–8 (опубликованы) и Stage 9 (CSV Import/Export, реализован и проверен локально — раздел 32); фактическая приёмка каждого этапа, включая remote CI, — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже. Audit UI Stage 10+ остаётся планом. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–8 (опубликованы), Stage 9 (CSV Import/Export, раздел 32) и Stage 10 (Audit Log — read-only API и UI, раздел 33), реализованными и проверенными локально; фактическая приёмка каждого этапа, включая remote CI, — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
@@ -289,7 +289,7 @@ Pipeline: `upload → parse → preview → mapping → validation → duplicate
 
 ## 16. Аудит
 
-`AuditModule` предоставляет writer для `Transaction`, `Budget`, `Category`, `RecurringTransaction` и API только для чтения. Domain mutation и audit entry находятся в одной DB transaction с одним Prisma-клиентом. Ошибка audit отменяет изменение сущности. Аудит нужен с первых доменных мутаций; Stage 10 добавляет полноценное чтение и UI, а не начинает запись задним числом.
+`AuditModule` предоставляет writer для `Transaction`, `Budget`, `Category`, `RecurringTransaction` и API только для чтения (`GET /audit-log`, реализовано в Stage 10 — раздел 33). Domain mutation и audit entry находятся в одной DB transaction с одним Prisma-клиентом. Ошибка audit отменяет изменение сущности. Аудит писался с первых доменных мутаций Stage 4; Stage 10 добавил полноценное чтение и UI, а не начал запись задним числом.
 
 Снимки `before/after` соответствуют семантике `CREATE/UPDATE/DELETE/ARCHIVE` из `DISCOVERY.md`, раздел 7. Это разрешенный набор доменных полей, без паролей и токенов. Decimal сохраняется строкой, бизнес-дата — строкой даты; человекочитаемые названия категории включаются в снимок, чтобы последующее переименование/удаление не разрушило diff. Для scheduler владельцем записи является владелец правила, системное происхождение видно из `source` операции.
 
@@ -757,3 +757,60 @@ JSON, поэтому кнопка «Экспорт CSV» — обычная `<a 
 generated `getTransactionsExportUrl` (переиспользует типы фильтров), без
 обёртки над generated fetch-функцией, которая безусловно вызывает
 `JSON.parse` тела.
+
+## 33. Реализованный Stage 10 — Audit Log
+
+`AuditController`/`AuditService` (`GET /audit-log`) — единственный новый
+endpoint Stage 10; запись (`AuditWriter`) не менялась и работает с Stage 4.
+Сервис читает `audit_entries` напрямую по `userId` из auth context, без join
+к текущим `Transaction`/`Budget`/`Category`/`RecurringTransaction`: удаление
+исходной записи или последующее переименование категории не влияют на уже
+прочитанные снимки (историческое `categoryName` заморожено в `before/after`
+на момент мутации). Фильтры — `entityType`, `entityId`, `action`,
+`dateFrom`/`dateTo` (границы по календарным суткам UTC, `createdAt` —
+системная временная метка, а не business date); сортировка фиксирована
+newest-first с tie-break по `id`, как в списке транзакций. `entityId`
+использует уже существующий с Stage 4 составной индекс
+`audit_entries(userId, entityType, entityId)` — просмотр истории одной
+записи не требует дополнительного индекса и остаётся одним запросом без
+N+1. Отдельного `GET /audit-log/:id` не создавалось: `before/after` уже
+входят в каждый элемент списка (снимки — небольшой фиксированный JSON), и
+второй round-trip для «просмотра деталей» добавил бы сетевой запрос без
+дополнительной информации — «список» и «детали» из ROADMAP реализованы как
+одна страница с раскрывающимся диалогом (`AuditDetailSheet`), не как две
+API-операции.
+
+DB-level immutability (SELECT/INSERT-only runtime права на `audit_entries`,
+`grant-runtime.mjs`) и snapshot-инварианты действуют с Stage 4 и подтверждены
+`database.test.ts`; Stage 10 добавил API-уровня проверку того же свойства:
+`audit.test.ts` проверяет, что `/audit-log` не имеет `POST/PATCH/DELETE`
+(404 от Nest router, не 403 — маршруты физически не зарегистрированы).
+
+Frontend: `AuditLogPage` (`/audit-log`, ранее `PlaceholderPage`) переиспользует
+паттерн `RecurringPage`/`TransactionsPage` — `Card` с фильтрами,
+`LoadingState`/`ErrorState`/`EmptyState`, `Pagination`. `AuditList` — тот же
+`transaction-table`/`transaction-row` responsive-паттерн, что у списка
+операций. `AuditDiff` (`features/finance/audit-fields.ts`) — декларативная
+таблица полей на `entityType`, с русской подписью и форматтером на поле
+(`moneyText`/`dateText`/`iconNames`/`monthNames`); строка показывается только
+если поле реально присутствует хотя бы в одном из `before`/`after`
+(`hasOwnProperty`, а не truthy-проверка — различает «поля не было в старой
+схеме снимка» и «значение было `null`»), и только если `before !== after` для
+`UPDATE`/`ARCHIVE` — количество отображаемых строк равно количеству
+фактически изменённых полей, без raw JSON нигде на странице. Неизвестное
+историческое поле просто не попадает ни в одно определение и безопасно
+пропускается, не ломая экран. `dateTimeText` (`features/finance/format.ts`)
+форматирует `createdAt` в IANA `timeZone` владельца — единственное место в
+приложении, форматирующее момент, а не календарную business date.
+
+Отдельный `.compose.spec.ts` Playwright-сценарий для Stage 10 не добавлялся:
+ROADMAP явно допускает это как необязательное расширение после обязательного
+smoke suite («Дополнительный audit E2E возможен после обязательного smoke
+suite»), а golden path проверен вручную через реальный браузер (список,
+фильтры, детальный diff, responsive, focus-restore, отсутствие console
+errors) поверх реального docker-compose стека. Вместо Playwright-сценария
+добавлен `scripts/audit-acceptance.mjs`, включённый в `scripts/test-docker.mjs`
+по тому же контракту, что `budget-acceptance.mjs`/`csv-acceptance.mjs`
+(`(url, compose, databaseHash)`): CRUD → `/audit-log` на чистом
+docker-compose checkout, cross-user isolation по `entityId`, отсутствие
+мутирующих методов, устойчивость после повторного seed и restart `api`.

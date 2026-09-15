@@ -1,9 +1,10 @@
 # Finora
 
 Finora — приложение для управления личными финансами по [DISCOVERY.md](DISCOVERY.md).
-Stages 1–8 опубликованы: операции, бюджеты, dashboard/Insights и регулярные
-операции. Stage 9 добавляет импорт и экспорт CSV поверх той же финансовой
-логики. Интерфейс журнала аудита остаётся следующим этапом.
+Stages 1–9 опубликованы: операции, бюджеты, dashboard/Insights, регулярные
+операции и импорт/экспорт CSV. Stage 10 добавляет read-only журнал изменений
+(`/audit-log`) с читаемым до/после diff поверх аудита, который пишется с
+Stage 4.
 Фактические результаты приёмки записаны в REPORT.
 
 ## Запуск с чистого checkout
@@ -70,8 +71,8 @@ API наружу отдельно не опубликован. PostgreSQL опу
 364 audit entries**, 2 пользователя, валюты RUB/USD/EUR. Шесть месяцев с доходами,
 расходами, near/over budgets, высоким/низким savings rate и месячной динамикой.
 Сохранены snapshot-курсы, recurring salary/rent/subscriptions и читаемые audit diffs.
-Scheduler, dashboard/analytics API и CSV import/export уже работают; отдельного
-экрана истории импорта или интерфейса журнала аудита пока нет.
+Scheduler, dashboard/analytics API, CSV import/export и журнал изменений
+(`/audit-log`) уже работают; отдельного экрана истории импорта пока нет.
 
 Первая загрузка выбирает текущий UTC-месяц как последний месяц истории. Опора
 сохраняется в seed-записи и не меняется при restart. Для точной воспроизводимости
@@ -495,3 +496,39 @@ ownership, formula injection, атомарность partial import, повто�
 повторный импорт, экспорт (BOM/formula injection) и мобильный viewport через
 production Nginx. `pnpm test:e2e:stage9-stress` — 20 последовательных запусков этого
 suite с `workers=1/2/4`, `retries=0`.
+
+## Журнал изменений (Stage 10)
+
+`/audit-log` — read-only список собственных записей аудита (пишется атомарно с
+каждой доменной мутацией с Stage 4) с фильтрами и пагинацией.
+
+| Метод | URL                 | Назначение                                                                          |
+| ----- | ------------------- | ----------------------------------------------------------------------------------- |
+| GET   | `/api/v1/audit-log` | Список: `entityType/entityId/action/dateFrom/dateTo`, newest-first, только владелец |
+
+Мутирующих методов у ресурса нет: `POST/PATCH/DELETE /audit-log` — 404 (маршрут
+не зарегистрирован), а не 403. Runtime-роль БД имеет только `SELECT, INSERT` на
+`audit_entries` с Stage 4 (`scripts/grant-runtime.mjs`) — это подтверждено
+`database.test.ts`. Чтение не джойнится с текущими `Transaction/Budget/Category
+/RecurringTransaction`: удаление исходной записи и последующее переименование
+категории не меняют уже прочитанный `before/after` — снимок заморожен на момент
+мутации.
+
+UI (`AuditLogPage`, `AuditDiff`) переводит known-поля каждого снимка в русские
+подписи и показывает только реально изменившиеся поля вместо raw JSON; для
+`CREATE`/`DELETE` показывается единственное состояние (`после`/`до`), для
+`UPDATE`/`ARCHIVE` — только различающиеся поля как «было → стало».
+
+`pnpm --filter @finora/api test` покрывает ownership isolation, фильтры/
+пагинацию/сортировку, отсутствие мутирующих методов, атомарную полноту аудита
+по всем четырём сущностям (`CREATE/UPDATE/DELETE/ARCHIVE`, включая каскадный
+archive категории → активное recurring-правило) и сохранение истории после
+удаления операции и последующего переименования её категории.
+`pnpm --filter @finora/web test` покрывает loading/empty/error/retry, читаемый
+diff (включая проверку, что неизменившееся поле не попадает в список), и смену
+query-параметров фильтрами. `pnpm test:docker` добавляет `audit-acceptance.mjs`
+по тому же контракту, что `budget-acceptance.mjs`: CRUD → `/audit-log` на
+чистом checkout, cross-user isolation и устойчивость после повторного seed и
+restart `api`. Отдельный Playwright `.compose.spec.ts` не добавлялся — ROADMAP
+явно допускает это как необязательное расширение после обязательного smoke
+suite; golden path дополнительно проверен вручную в реальном браузере.

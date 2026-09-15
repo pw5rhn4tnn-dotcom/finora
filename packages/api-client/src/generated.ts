@@ -111,6 +111,78 @@ export interface ProfileInputDto {
 }
 
 /**
+ * Тип затронутой сущности
+ */
+export type AuditEntryDtoEntityType = typeof AuditEntryDtoEntityType[keyof typeof AuditEntryDtoEntityType];
+
+
+export const AuditEntryDtoEntityType = {
+  Transaction: 'Transaction',
+  Budget: 'Budget',
+  Category: 'Category',
+  RecurringTransaction: 'RecurringTransaction',
+} as const;
+
+/**
+ * Действие
+ */
+export type AuditEntryDtoAction = typeof AuditEntryDtoAction[keyof typeof AuditEntryDtoAction];
+
+
+export const AuditEntryDtoAction = {
+  CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+  ARCHIVE: 'ARCHIVE',
+} as const;
+
+/**
+ * Снимок до изменения; отсутствует для CREATE. Раскладка полей зависит от entityType
+ * @nullable
+ */
+export type AuditEntryDtoBefore = { [key: string]: unknown } | null;
+
+/**
+ * Снимок после изменения; отсутствует для DELETE
+ * @nullable
+ */
+export type AuditEntryDtoAfter = { [key: string]: unknown } | null;
+
+export interface AuditEntryDto {
+  /** Идентификатор записи аудита */
+  id: string;
+  /** Тип затронутой сущности */
+  entityType: AuditEntryDtoEntityType;
+  /** Идентификатор затронутой сущности; сущность может быть уже удалена */
+  entityId: string;
+  /** Действие */
+  action: AuditEntryDtoAction;
+  /**
+     * Снимок до изменения; отсутствует для CREATE. Раскладка полей зависит от entityType
+     * @nullable
+     */
+  before: AuditEntryDtoBefore;
+  /**
+     * Снимок после изменения; отсутствует для DELETE
+     * @nullable
+     */
+  after: AuditEntryDtoAfter;
+  /** Момент записи */
+  createdAt: string;
+}
+
+export interface AuditPageDto {
+  /** Номер страницы */
+  page: number;
+  /** Размер страницы */
+  pageSize: number;
+  /** Всего собственных записей после фильтрации */
+  total: number;
+  /** Записи страницы */
+  items: AuditEntryDto[];
+}
+
+/**
  * Тип категории
  */
 export type CategoryDtoType = typeof CategoryDtoType[keyof typeof CategoryDtoType];
@@ -938,6 +1010,70 @@ export interface ImportResultDto {
   /** Фактически импортировано операций */
   imported: number;
 }
+
+export type AuditListParams = {
+/**
+ * Номер страницы от 1
+ * @minimum 1
+ * @maximum 9999999
+ */
+page?: number;
+/**
+ * Размер страницы
+ */
+pageSize?: AuditListPageSize;
+/**
+ * Тип сущности
+ */
+entityType?: AuditListEntityType;
+/**
+ * История одной сущности (обычно вместе с entityType)
+ */
+entityId?: string;
+/**
+ * Действие
+ */
+action?: AuditListAction;
+/**
+ * Начальная дата включительно
+ */
+dateFrom?: string;
+/**
+ * Конечная дата включительно
+ */
+dateTo?: string;
+};
+
+export type AuditListPageSize = typeof AuditListPageSize[keyof typeof AuditListPageSize];
+
+
+export const AuditListPageSize = {
+  NUMBER_10: 10,
+  NUMBER_25: 25,
+  NUMBER_50: 50,
+} as const;
+
+export type AuditListEntityType = typeof AuditListEntityType[keyof typeof AuditListEntityType];
+
+
+export const AuditListEntityType = {
+  ALL: 'ALL',
+  Transaction: 'Transaction',
+  Budget: 'Budget',
+  Category: 'Category',
+  RecurringTransaction: 'RecurringTransaction',
+} as const;
+
+export type AuditListAction = typeof AuditListAction[keyof typeof AuditListAction];
+
+
+export const AuditListAction = {
+  ALL: 'ALL',
+  CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+  ARCHIVE: 'ARCHIVE',
+} as const;
 
 export type CategoriesListParams = {
 /**
@@ -1956,6 +2092,98 @@ const res = await fetch(getSettingsUpdateUrl(),
 
   const data: settingsUpdateResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as settingsUpdateResponse
+}
+
+
+
+export type auditListResponse200 = {
+  data: AuditPageDto
+  status: 200
+}
+
+export type auditListResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type auditListResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type auditListResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type auditListResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type auditListResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type auditListResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type auditListResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type auditListResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type auditListResponseSuccess = (auditListResponse200) & {
+  headers: Headers;
+};
+export type auditListResponseError = (auditListResponse400 | auditListResponse401 | auditListResponse403 | auditListResponse404 | auditListResponse409 | auditListResponse413 | auditListResponse429 | auditListResponse500) & {
+  headers: Headers;
+};
+
+export type auditListResponse = (auditListResponseSuccess | auditListResponseError)
+
+export const getAuditListUrl = (params?: AuditListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/audit-log?${stringifiedParams}` : `/api/v1/audit-log`
+}
+
+/**
+ * @summary Read-only список собственных записей аудита с фильтрами и серверной пагинацией
+ */
+export const auditList = async (params?: AuditListParams, options?: RequestInit): Promise<auditListResponse> => {
+
+  const res = await fetch(getAuditListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: auditListResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as auditListResponse
 }
 
 

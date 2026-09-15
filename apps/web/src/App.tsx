@@ -6,6 +6,7 @@ import { BudgetsPage } from './pages/BudgetsPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ImportPage } from './pages/ImportPage';
+import { AuditLogPage } from './pages/AuditLogPage';
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router';
 import { AppShell } from './app/AppShell';
@@ -32,6 +33,7 @@ export function App() {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/budgets" element={<BudgetsPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/audit-log" element={<AuditLogPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route index element={<OverviewPage />} />
           {navigation
@@ -44,6 +46,7 @@ export function App() {
                   '/categories',
                   '/budgets',
                   '/recurring',
+                  '/audit-log',
                 ].includes(item.to),
             )
             .map((item) => (
