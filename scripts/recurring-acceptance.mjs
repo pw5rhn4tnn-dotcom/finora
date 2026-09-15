@@ -2,8 +2,30 @@ import assert from 'node:assert/strict';
 import { setTimeout } from 'node:timers/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { rm } from 'node:fs/promises';
 
 const exec = promisify(execFile);
+
+// `apps/api/dist-test/test/recurring-scheduler-worker.js` — не входной
+// артефакт acceptance, а её собственный build-шаг. Раньше файл появлялся
+// только как побочный эффект отдельного `pnpm --filter @finora/api test`
+// (тот компилирует apps/api/test/**/*.ts через tsconfig.test.json перед
+// `node --test`), из-за чего на чистом checkout/CI runner, где этот шаг не
+// выполнялся первым, exec ниже падал с MODULE_NOT_FOUND вместо ожидаемой
+// ошибки подключения к PostgreSQL. Компилируем worker сама, тем же
+// tsconfig.test.json, каждый прогон — не полагаясь на то, что уже могло
+// остаться от прошлых команд.
+async function buildSchedulerWorker() {
+  await rm('apps/api/dist-test', { recursive: true, force: true });
+  await exec('pnpm', [
+    '--filter',
+    '@finora/api',
+    'exec',
+    'tsc',
+    '-p',
+    'tsconfig.test.json',
+  ]);
+}
 
 function todayInZone(timeZone) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -199,6 +221,7 @@ export async function recurringAcceptance(url, compose, databaseHash) {
 // самой попытки во время outage используется прямой вызов harness, а не
 // restart контейнера.
 export async function recurringOutageAcceptance(url, compose, env) {
+  await buildSchedulerWorker();
   const request = (path, method = 'GET', data, cookie) =>
     fetch(`${url}/api/v1${path}`, {
       method,

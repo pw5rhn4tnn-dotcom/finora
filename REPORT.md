@@ -2217,3 +2217,160 @@ Stage 5–7 не нарушен, self-review завершён и найденн�
 Commit и push не выполнены — по прямому ограничению задания, не по забывчивости;
 итоговый `FINAL COMPLETE` возможен только после commit и зелёного remote
 GitHub Actions на Linux x86_64 для этого коммита.
+
+## Stage 8 — repair после remote CI FAILED: clean-runner MODULE_NOT_FOUND (2026-09-15)
+
+Коммит `848c384` («реализовать регулярные операции и завершить Stage 8»),
+описанный выше как `STAGE 8 LOCAL VALIDATION COMPLETE`, был отправлен на
+проверку в remote GitHub Actions. `docker` job упал:
+
+```
+Error: Cannot find module
+'/home/runner/work/finora/finora/apps/api/dist-test/test/recurring-scheduler-worker.js'
+code: 'MODULE_NOT_FOUND'
+```
+
+Stage 8 outage acceptance ожидал контролируемый отказ подключения к
+PostgreSQL (`ECONNREFUSED`/`Can't reach database server`/`connect`), а получил
+`MODULE_NOT_FOUND` до того, как попытка вообще дошла до `runSchedulerTick`.
+Локально `pnpm test:docker` перед коммитом проходил зелёным — это тот же
+класс ложноположительного локального результата, что и предыдущие remote
+repair записи выше: red run — реальный, переписывать его задним числом
+объявлением `COMPLETE` неверно.
+
+### Root cause
+
+`scripts/recurring-acceptance.mjs` (`recurringOutageAcceptance`) напрямую
+вызывает скомпилированный файл `apps/api/dist-test/test/recurring-scheduler-worker.js`
+— прямой вызов production `runSchedulerTick` из отдельного OS-процесса, чтобы
+воспроизвести реальную попытку обработки due occurrence именно в момент
+недоступности PostgreSQL (см. комментарий над функцией). Этот `.js` файл —
+не входной артефакт acceptance, а результат компиляции `apps/api/test/**/*.ts`
+через `tsconfig.test.json` (`outDir: dist-test`), и раньше он появлялся
+исключительно как побочный эффект отдельной команды: `apps/api`'s собственный
+`test` script (`pnpm --filter @finora/api test`) сначала удаляет `dist-test`,
+затем компилирует его заново, затем запускает `node --test`. Сам `test:docker`
+(`scripts/test-docker.mjs`) этот шаг никогда не выполнял и не полагался на
+него явно.
+
+Локально `dist-test` почти всегда уже существовал к моменту запуска
+`pnpm test:docker`, потому что перед ним так или иначе запускался
+`pnpm test`/`pnpm -r run test` (в том числе в рамках привычной проверки перед
+коммитом) — артефакт молча переживал между несвязанными командами, так как
+`dist-test/` в `.gitignore`, но ничего не удаляет его между прогонами. В CI
+то же самое маскирование происходило в job `foundation`: шаг «Запустить smoke
+и PostgreSQL integration tests» (`pnpm test`) шёл раньше шага
+«Проверить auth и финансовый CRUD через Nginx и PostgreSQL в браузере»
+(`pnpm test:e2e:auth` → тот же `scripts/test-docker.mjs --browser`, тот же
+`recurringOutageAcceptance`), поэтому `dist-test` там уже существовал.
+Отдельный job `docker` в `.github/workflows/ci.yml` — единственное место,
+где `scripts/test-docker.mjs` запускался на чистом чекауте без какого-либо
+предшествующего `pnpm test`; более того, этот job вообще не выполнял
+`pnpm install`, то есть на раннере не было ни `node_modules`, ни возможности
+что-либо скомпилировать. Только там скрытая зависимость от чужого побочного
+эффекта проявилась как `MODULE_NOT_FOUND`.
+
+Проверка класса проблемы целиком: остальные обращения к `dist/...` в
+acceptance-скриптах (`finance-acceptance.mjs`, `budget-acceptance.mjs`,
+`recurring-acceptance.mjs` seed, `test-docker.mjs`) — это всегда
+`compose('exec', '-T', 'api', 'node', 'dist/...')`, то есть выполняются
+**внутри** Docker-контейнера, чей образ `apps/api/Dockerfile` собирает с нуля
+собственным `pnpm install --frozen-lockfile` + `pnpm --filter @finora/api build`
+на стадии `build`, — эти пути не зависят от host filesystem и не подвержены
+этому классу дефекта. `check-stage6-e2e.mjs`/`check-stage7-e2e.mjs`/
+`security-compose.mjs` вызывают `pnpm`/`playwright` на хосте, но достижимы
+только через `--browser`-ветку `test:docker`, которая используется исключительно
+из `pnpm test:e2e:auth` в job `foundation`, где `pnpm install` и `pnpm build`
+уже гарантированно выполнены предыдущими шагами того же job. Единственная
+точка, скрыто зависевшая от чужого прогона на голом host-runner, —
+`apps/api/dist-test/test/recurring-scheduler-worker.js` в
+`recurringOutageAcceptance`.
+
+### Исправление
+
+`scripts/recurring-acceptance.mjs`: добавлена `buildSchedulerWorker()` —
+`rm -rf apps/api/dist-test`, затем `pnpm --filter @finora/api exec tsc -p
+tsconfig.test.json` (та же команда компиляции, что и штатный `test` script
+`apps/api`, без хардкода путей к `node_modules/.bin` или GitHub-specific
+путей). Вызывается первой строкой `recurringOutageAcceptance()` — harness
+теперь сам детерминированно производит нужный артефакт при каждом запуске,
+не полагаясь ни на что, что могло (или не могло) выполниться раньше в этом
+же окружении. Никакого fallback «worker отсутствует — пропустить тест» не
+добавлено; `dist-test` в Git не закоммичен.
+
+`.github/workflows/ci.yml`: job `docker` не выполнял `pnpm install`, поэтому
+даже корректный build-шаг не нашёл бы `typescript`/`node_modules`. Добавлены
+те же шаги `pnpm/action-setup` + `pnpm install --frozen-lockfile`, что уже
+использует job `foundation`. Проверено локально: `prisma generate`
+(postinstall) не требует `MIGRATION_DATABASE_URL`/`DATABASE_URL` — с обеими
+переменными пустыми `pnpm --filter @finora/api db:generate` проходит
+(`datasource.url` в `prisma.config.ts` падает на `''` без ошибки на этапе
+generate), так что дополнительных env-переменных для job не потребовалось.
+
+### Clean-state воспроизведение и regression evidence
+
+Перед каждым из двух прогонов ниже `apps/api/dist-test` и `apps/web/test-results`
+намеренно удалялись, и `ls apps/api/dist-test` подтверждал отсутствие
+worker-артефакта непосредственно перед стартом `pnpm test:docker` — то есть
+условие чистого checkout/чистого раннера воспроизведено буквально, а не
+предположено. Первый прогон (до старта локального Docker Desktop) корректно
+упал на попытке подключиться к Docker daemon — подтверждает, что тестовое
+окружение действительно было чистым и ничего не «подсказывало» результат
+заранее. После запуска Docker Desktop `pnpm test:docker` повторён с нуля от
+того же чистого состояния (`dist-test` по-прежнему отсутствовал) и прошёл
+полностью зелёным:
+
+```
+PASS: Stage 5 CRUD, isolation, archive, repeat seed, API restart, edited/deleted persistence
+PASS Stage 6 Compose: budget CRUD, actual Decimal/date, duplicate/ownership/isolation, seed/restart persistence
+PASS Dashboard: SQL aggregate/KPI/top5/budgets, two owners, strict query, empty, read-only and restart/seed persistence
+PASS Stage 8 Compose: recurring create/ownership/archive, catch-up на restart без дублей, seed/restart persistence
+PASS Stage 8 outage attempt: реальный вызов runSchedulerTick во время недоступности PostgreSQL завершился controlled failure
+PASS Stage 8 Compose: due occurrence переживает недоступность PostgreSQL без partial state, catch-up после восстановления создаёт ровно одну Transaction, повтор не дублирует
+PASS: clean/repeated startup, seed ×3, DB outage/recovery; dataset SHA-256 55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0
+```
+
+Это одновременно доказывает все требуемые пункты: worker собрался и
+запустился корректно без предварительного `dist-test`; outage-попытка дошла
+до реального `runSchedulerTick` и получила именно ожидаемый DB connectivity
+failure (assert на `ECONNREFUSED`/`Can't reach database server`/`connect` —
+иначе весь прогон упал бы с ненулевым exit code, чего не произошло); после
+восстановления PostgreSQL catch-up создал ровно одну Transaction; повторный
+`restart api` на ту же логическую дату не создал дублей. Полный
+`pnpm test:docker` (а не только recurring acceptance) подтверждает, что
+Stage 5/6/7/8 regressions не задеты. Ничего не собрано в `--browser`-режиме
+в этом repair pass (Playwright browser suite не запускался) — это тот же
+`docker`-only CI job, что упал изначально, и repair нацелен именно на него.
+
+Отдельного regression-теста, который бы сам симулировал «чистый раннер»
+(например, самостоятельно проверял пустой `node_modules`), не добавлено —
+это дублировало бы то, что `buildSchedulerWorker()` уже делает безусловно
+на каждом прогоне: `rm -rf` + компиляция заново, без ветвления «если файла
+нет». Условие «зависимость от чужого побочного эффекта» устранено тем, что
+такого побочного эффекта больше не требуется, а не тем, что за ним следят.
+
+Финальные локальные проверки после исправления: `pnpm typecheck`,
+`pnpm lint`, `pnpm format:check`, `pnpm api:check`, `git diff --check` —
+все прошли без замечаний. `git status --short` после полного `test:docker`
+прогона (который пересобирает `apps/api/dist`, `apps/api/dist-test`,
+`apps/api/src/generated/prisma`, `apps/web/test-results` — все в
+`.gitignore`) показывает только два изменённых файла:
+
+```
+ M .github/workflows/ci.yml
+ M scripts/recurring-acceptance.mjs
+```
+
+Новый remote GitHub Actions run на этот repair commit в этой сессии не
+выполнялся — commit и push не сделаны по прямому ограничению задания.
+Настоящее подтверждение дефекта — предыдущий red remote run (`docker` job,
+коммит `848c384`); эта запись фиксирует его как есть, а не переписывает
+задним числом.
+
+### Итоговый статус (обновлён)
+
+**REMOTE CI FIX READY FOR COMMIT.** Root cause найден и устранён архитектурно
+(acceptance harness сам производит свою build-зависимость на каждом прогоне,
+без коммита `dist-test` в Git и без ослабления теста), полный `pnpm test:docker`
+и все локальные gate-проверки зелёные от заведомо чистого состояния.
+Stage 9 не начат. Commit/push не выполнены — ждут явного разрешения.

@@ -83,5 +83,11 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
+      - name: Настроить pnpm из packageManager
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - name: Установить зависимости и сгенерировать Prisma client
+        run: pnpm install --frozen-lockfile
       - name: Проверить Compose builds, миграции, seed и HTTP
         run: node scripts/test-docker.mjs
