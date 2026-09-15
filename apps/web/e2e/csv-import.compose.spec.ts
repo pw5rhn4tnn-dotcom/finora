@@ -1,11 +1,75 @@
 import { type Page } from '@playwright/test';
-import { test, expect } from './compose-session';
+import { randomUUID } from 'node:crypto';
+import {
+  test as base,
+  expect,
+  profilePassword,
+  type ComposeSessions,
+} from './compose-session';
 import { z } from 'zod';
 
 // Переиспользуем уже аутентифицированную сессию compose-auth setup вместо
 // живого login(page) в каждом тесте: так тесты не расходуют общий login
 // rate limit (10/60s), который иначе делят с auth.compose.spec.ts и
 // finance.compose.spec.ts при последовательном запуске всего suite.
+
+// В отличие от остальных compose-файлов, тесты этого файла интенсивно
+// мутируют финансовые данные (create/update/delete/import commit) — каждая
+// такая мутация сериализуется через `lockOwner` (`SELECT ... FOR UPDATE` на
+// строку пользователя, apps/api/src/modules/finance/locking.ts) ради
+// корректности конкурентных финансовых операций одного реального аккаунта.
+// При переиспользовании общего compose-auth `sessions.personal` эта
+// сериализация непреднамеренно распространяется на тесты этого файла,
+// реально выполняющиеся параллельно под `--workers=2/4`: они начинают
+// сериализоваться друг за другом на одной и той же блокировке и делить один
+// и тот же (ограниченный) пул соединений БД API-процесса. На быстрой
+// локальной машине это разрешается за единицы миллисекунд и незаметно; на
+// более медленном/загруженном раннере (remote CI) та же очередь может
+// растянуться настолько, что случайно совпавший по времени, никак не
+// связанный с блокировкой `GET /api/v1/transactions` (не берёт lockOwner)
+// не успевает получить свободное соединение из пула и превышает Playwright
+// default request timeout — это и произошло в `cleanupBySearch()` на
+// remote CI (см. REPORT.md, repair Stage 10). Поэтому здесь каждый WORKER
+// (не каждый тест — не тратить впустую auth register rate limit 5/час)
+// получает собственный, независимый от `personal` изолированный аккаунт:
+// тесты этого файла больше не делят одну и ту же строку пользователя и не
+// сериализуются друг относительно друга.
+const test = base.extend<object, { csvOwner: ComposeSessions['personal'] }>({
+  csvOwner: [
+    async ({ playwright }, use, workerInfo) => {
+      const baseURL = workerInfo.project.use.baseURL;
+      if (!baseURL) throw new Error('Нужен Compose baseURL');
+      const request = await playwright.request.newContext({
+        baseURL,
+        extraHTTPHeaders: { Origin: baseURL },
+      });
+      try {
+        const registered = await request.post('/api/v1/auth/register', {
+          data: {
+            email: `csv-import-w${workerInfo.workerIndex}-${randomUUID()}@stage9.example`,
+            password: profilePassword,
+            displayName: 'CSV import (изолированный worker-аккаунт)',
+            baseCurrency: 'RUB',
+            timeZone: 'Europe/Moscow',
+          },
+        });
+        expect(registered.status()).toBe(201);
+        await use(await request.storageState());
+      } finally {
+        await request.dispose();
+      }
+    },
+    { scope: 'worker' },
+  ],
+  sessions: async ({ csvOwner }, use) => {
+    await use({
+      run: randomUUID(),
+      email: '',
+      personal: csvOwner,
+      profile: csvOwner,
+    });
+  },
+});
 
 // CSV-импорт не отслеживается общей `finance` fixture (POST /imports
 // возвращает счётчики, а не id созданных записей), поэтому тест сам находит
