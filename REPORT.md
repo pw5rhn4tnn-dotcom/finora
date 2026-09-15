@@ -3192,3 +3192,143 @@ Playwright workers), см. repair выше; сам Stage 10 scope при это�
 сессии — только по отдельному разрешению пользователя. До нового remote
 GitHub Actions run на текущий HEAD итоговый статус — `STAGE 10 LOCAL
 VALIDATION COMPLETE — REMOTE CI GATE PENDING`, не `FINAL COMPLETE`.
+
+### Подтверждение remote CI green (Stage 11 preflight)
+
+Перед началом Stage 11 проверен фактический статус remote GitHub Actions для
+HEAD `7f4cdd8` (репозиторий `pw5rhn4tnn-dotcom/finora`, `gh run list`):
+`conclusion: success`, `2026-09-15T14:29:35Z` — то есть remote CI на текущем
+HEAD зелёный, и запись выше устарела только в формулировке итогового статуса
+(написана до появления этого run). Фактическая история запусков не
+переписывается; здесь лишь фиксируется прочитанное состояние remote на
+момент начала Stage 11.
+
+## 15.09.2026 — Stage 11: Hardening & Testing
+
+Исходная точка: `git status --short` в начале сессии — чисто; HEAD `7f4cdd8`
+(Stage 10 + repair, см. запись выше; remote CI на этом HEAD — success, см.
+Stage 11 preflight выше). До реализации прочитаны AI_RULES.md целиком,
+раздел Stage 11 ROADMAP.md и связанные части ARCHITECTURE.md (§11–19,
+§24–27 — auth/security/транзакции/scheduler/CSV/audit/dashboard/валидация/
+ошибки/CI/производительность/риски).
+
+### Scope
+
+Stage 11 по ROADMAP — не добавление функций, а targeted review существующей
+реализации (security/data integrity/concurrency/performance/frontend
+quality) и подтверждение готовности к сдаче. Прочитан и повторно
+проанализирован код: `auth.guard.ts`, `security.guard.ts`,
+`session.service.ts`, `auth.service.ts`, `password.ts`, `locking.ts`,
+`transactions.service.ts`, `budgets.service.ts`, `categories.service.ts`,
+`recurring/engine.ts`, `recurring/scheduler.service.ts`, `recurring/
+calendar.ts`, `imports.service.ts`, `imports.validation.ts`, `csv.ts`,
+`audit.service.ts`, `users.service.ts`, `dashboard.service.ts`,
+`finance/money.ts`, `finance/validation.ts`, `bootstrap.ts`, `main.ts`, а
+также frontend-исходники (`apps/web/src`, 63 файла) точечным сканированием
+на типовые антипаттерны (`dangerouslySetInnerHTML`, необоснованный `any`,
+пустые `catch`).
+
+### Найденные дефекты и исправления
+
+**1. Уязвимые зафиксированные версии зависимостей (dependency sanity).**
+`pnpm audit --prod` до исправления — 7 advisories (5 high, 1 moderate, 1
+low):
+
+- `multer@2.2.0` (прямая зависимость `apps/api`, а также 3 отдельные
+  транзитивные копии той же точной версии внутри `@nestjs/core`,
+  `@nestjs/platform-express`, `@nestjs/swagger` — каждый из этих пакетов
+  сам жёстко фиксирует `multer: 2.2.0`, а не диапазон): DoS через file
+  descriptor leak на прерванной загрузке (GHSA-wc9g-mqfw-jrwm), DoS через
+  oversized array index в имени поля (GHSA-535w-7cp7-47q4, исправлено в
+  ≥2.3.0), race condition обхода лимита размера файла через async
+  `fileFilter` (GHSA-qvfw-j98x-7q72, low). Прямое отношение к Stage 11
+  security-обзору: `multer` — обработчик CSV upload (`imports.controller.ts`),
+  явно названный в scope как «upload/CSV abuse cases».
+- `mysql2@3.15.3` (транзитив `prisma`/`@prisma/client`, недостижим в
+  рантайме — приложение использует только PostgreSQL через
+  `@prisma/adapter-pg`): moderate DoS через unbounded zlib inflate
+  (GHSA-rgwj-5xj2-c3m3).
+- `deepmerge-ts@7.1.5` (транзитив `@prisma/config`, используется только при
+  загрузке `prisma.config.ts` в CLI/build time, не в рантайме API): high
+  stack exhaustion при рекурсивном merge (GHSA-ggr8-5vv4-36mx).
+
+Root cause: `multer` был зафиксирован точной уязвимой версией на момент
+первоначальной установки (Stage 9), причём `saveExact: true`
+(`pnpm-workspace.yaml`) обеспечивает точную фиксацию только прямой
+зависимости — три транзитивных пакета NestJS сами точно фиксируют
+собственную копию `multer`, независимо от версии в `apps/api/package.json`.
+
+Исправление: `apps/api/package.json` — `multer` `2.2.0` → `2.4.0` (последняя
+стабильная патченная версия; `@types/multer` уже на последней доступной
+`2.2.0`, совместим). В `pnpm-workspace.yaml` добавлен `overrides` —
+`multer: 2.4.0`, `mysql2: 3.24.4`, `deepmerge-ts: 8.0.2` — синхронизирует
+все транзитивные копии на патченные версии одним точечным изменением, без
+общего апгрейда зависимостей. `pnpm audit` после исправления — «No known
+vulnerabilities found».
+
+Дефектов логики/архитектуры (ownership, mass assignment, atomic
+transactions+audit, decimal/date correctness, N+1) при review не
+обнаружено: `z.strictObject` во всех input-схемах исключает mass
+assignment; `lockOwner` последовательно применяется во всех финансовых
+мутациях (transactions/budgets/categories/recurring/imports); dashboard
+использует фиксированный бюджет ≤7 SELECT независимо от объёма данных
+(комментарий в коде явно фиксирует инвариант); CSV pipeline уже нейтрализует
+formula injection и не создаёт mass assignment через мастер mapping
+(`mappingTargets` — closed list, server-controlled поля недостижимы).
+Известный ранее дефект shared Playwright-user isolation (Stage 10 repair)
+не воспроизводился повторно.
+
+### Проверки после исправления
+
+| Проверка                                                   | Результат                                       |
+| ---------------------------------------------------------- | ----------------------------------------------- |
+| `pnpm audit` (prod + dev)                                  | 0 уязвимостей (было 7: 5 high/1 moderate/1 low) |
+| lint / format:check / typecheck / build                    | PASS                                            |
+| db:validate / api:check                                    | PASS                                            |
+| Backend tests (`pnpm --filter @finora/api test`)           | PASS 137/137                                    |
+| Frontend tests (`pnpm --filter @finora/web test`)          | PASS 97/97                                      |
+| Docker clean-checkout acceptance (`test:docker --browser`) | PASS, exit code 0 (детали ниже)                 |
+
+Полный `pnpm test:docker --browser` — чистая копия (`git ls-files`) во
+временную директорию, независимый одноразовый Compose-проект,
+`WEB_PORT=0`/`POSTGRES_PORT=0` (случайные порты, без конфликта с уже
+запущенным dev-окружением): Stage 5/6/Dashboard/8 (включая outage-тест
+управляемого сбоя PostgreSQL во время recurring tick)/9/10 acceptance —
+PASS; полный Playwright-browser набор (auth, finance, budgets, dashboard,
+CSV wizard/export/mobile) — PASS; **Stage 9 stress 20/20** (workers 1/2/4,
+retries=0, 80 test cases суммарно) — ни одного flake/timeout, включая
+комбинацию workers=2 итерация 11, ранее (Stage 10) воспроизводившую remote
+CI регрессию; **Stage 7 dashboard-stress 20/20** (workers 1/2/4,
+repeat-each=2, retries=0, 120 critical cases) — без единого flake. Итоговый
+dataset SHA-256 стабилен после повторного restart/seed:
+`55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0`.
+Acceptance-окружение и его volume удалены runner'ом по завершении — clean-up
+подтверждён.
+
+Отдельный новый regression-тест для Stage 11 не добавлялся: review не
+выявил продуктового дефекта логики, требующего нового детерминированного
+теста (единственный найденный дефект — версия зависимости, не поведение
+кода), а существующий stress/regression suite (Stage 6/7/8/9 concurrency и
+E2E-изоляция) уже покрывает все реальные shared-state зоны проекта и
+подтверждён зелёным повторным прогоном на изменённых зависимостях.
+
+### Dependency / operational sanity
+
+`pnpm outdated` не проверялся на предмет общего апгрейда — вне scope Stage
+11 («не делай массовый upgrade зависимостей без необходимости»); проверены
+и исправлены только версии, помеченные `pnpm audit` как уязвимые. Явных
+deprecated-пакетов или несовместимых critical packages, помимо
+перечисленных выше, не найдено. `engines`/`.nvmrc`/`packageManager`
+согласованы (`node: 24.21.0`, `pnpm: 12.4.1`).
+
+### Итоговый статус
+
+**STAGE 11 LOCAL VALIDATION COMPLETE — REMOTE CI GATE PENDING.** Targeted
+review Stage 11 выполнен по всем заявленным направлениям (security, data
+integrity, concurrency, performance, frontend quality); единственный
+найденный реальный дефект — уязвимые зафиксированные версии зависимостей
+(`multer`/`mysql2`/`deepmerge-ts`) — исправлен точечным version bump и
+`pnpm overrides`, без общего апгрейда. Полный локальный gate зелёный,
+включая clean-checkout Docker acceptance и оба существующих 20-итерационных
+stress-теста (retries=0, без flake). Commit и push не выполнялись в этой
+сессии — только по отдельному разрешению пользователя. Stage 12 не начат.

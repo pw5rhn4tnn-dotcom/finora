@@ -7,6 +7,21 @@ strictPeerDependencies: true
 saveExact: true
 verifyDepsBeforeRun: error
 
+overrides:
+  # Транзитивные копии multer внутри @nestjs/core, @nestjs/platform-express,
+  # @nestjs/swagger сами закрепляют уязвимую 2.2.0 (Stage 11 dependency audit:
+  # 3 high + 1 low DoS/race advisories, исправлены в >=2.3.0). Прямая
+  # зависимость apps/api обновлена рядом; override синхронизирует все копии.
+  multer: 2.4.0
+  # mysql2 — недостижимый в рантайме транзитив prisma CLI (используем только
+  # PostgreSQL через @prisma/adapter-pg), но moderate DoS-advisory исправлен
+  # безопасным minor-бампом без изменения используемого функционала.
+  mysql2: 3.24.4
+  # deepmerge-ts — используется только при загрузке prisma.config.ts в CLI
+  # (build/migrate time, не рантайм API), но high stack-exhaustion advisory
+  # исправлен безопасным бампом до патченной версии.
+  deepmerge-ts: 8.0.2
+
 allowBuilds:
   '@scarf/scarf': false
   esbuild: true
