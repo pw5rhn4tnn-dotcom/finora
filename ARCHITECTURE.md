@@ -2,7 +2,7 @@
 
 Продуктовые требования, UX-решения и бизнес-правила определены в `PROJECT.md` и `DISCOVERY.md`. `ARCHITECTURE.md` описывает техническую реализацию этих требований.
 
-Статус: целевая архитектура v1.0 с реализованными Stage 1–8 (опубликованы), Stage 9 (CSV Import/Export, раздел 32) и Stage 10 (Audit Log — read-only API и UI, раздел 33), реализованными и проверенными локально; фактическая приёмка каждого этапа, включая remote CI, — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
+Статус: целевая архитектура v1.0 с реализованными Stage 1–8 (опубликованы), Stage 9 (CSV Import/Export, раздел 32), Stage 10 (Audit Log — read-only API и UI, раздел 33) и Stage 11 (Hardening & Testing — targeted security/data integrity/concurrency/performance review, без изменения контрактов), реализованными и проверенными локально; фактическая приёмка каждого этапа, включая remote CI, — в REPORT. PostgreSQL/Prisma, миграции, seed, health, Swagger/Orval и Compose описаны ниже. Порядок работ и критерии переходов находятся в [ROADMAP.md](ROADMAP.md).
 
 ## 1. Назначение и источники истины
 
