@@ -640,7 +640,7 @@ build с окончательным CSS — exit 0. Source integrity подтв�
 Ограничение осталось только для remote CI и не проведённых проверок на физических
 устройствах/screen reader; обязательные локальные проверки Stage 3 пройдены.
 
-## 2026-09-14 — исправление Docker acceptance в CI Stage 3
+### Исправление Docker acceptance в CI
 
 Инструмент: Codex; использован навык diagnosing-bugs, без субагентов.
 Задача ограничена падением acceptance после остановки PostgreSQL. Stage 4 не начат.
@@ -1213,7 +1213,7 @@ Stage 6 завершён. Stage 7 и последующие этапы не на
 scheduler, CSV, audit UI, dark mode и прочий последующий scope отложены. Commit,
 push и изменение Git history не выполнялись; HEAD остаётся `352d4cb`.
 
-## Stage 6 — repair/review после remote FAILED (2026-09-14)
+### Repair/review после remote CI FAILED
 
 Запрос пользователя: исправить только Stage 6, отдельно исследовать 1440×960,
 проверить portability/isolation и весь набор CI; Stage 7, commit и push запрещены.
@@ -1282,7 +1282,7 @@ Nginx POST /auth/login 429. Логи: `finora-stage6-repair-linux-nonroot-red.lo
 Повтор regression на macOS прошёл: 5 ожидаемых worker failures + 6 passed viewport,
 затем 12 passed viewport на 4 workers; все 36 PNG проверены.
 
-### Подтверждённые результаты repair pass
+#### Подтверждённые результаты repair pass
 
 После последних изменений tests/config/scripts выполнен весь набор команд
 существующего CI на macOS (Node 24.21.0, pnpm 12.4.1, PostgreSQL 17.6),
@@ -1354,7 +1354,7 @@ scripts/check-stage6-e2e.mjs. ARCHITECTURE.md прочитан; приложен
 копию. Stage 6 не объявляется прошедшим remote CI. Stage 7 не начат; roadmap scope
 Stage 6 сохранён. Commit, push и изменение Git history не выполнялись.
 
-## Повторный remote CI repair: Stage 5 DELETE/refetch race (2026-09-14)
+### Race DELETE/refetch (регрессия Stage 5)
 
 Работа ограничена диагностикой и repair run
 [34854794659](https://github.com/pw5rhn4tnn-dotcom/finora/actions/runs/34854794659),
@@ -1362,7 +1362,7 @@ SHA `42cc23c`. Stage 7 не начинался, новая функционал�
 Использован Codex и навык `diagnosing-bugs`; субагенты не использовались.
 Commit/push в этой сессии не выполнялись.
 
-### Remote evidence и границы доказательств
+#### Remote evidence и границы доказательств
 
 Команда runner: `pnpm --filter @finora/web exec playwright test auth.compose.spec.ts finance.compose.spec.ts`,
 18 tests / 2 workers / retries=0. Падение Stage 5 после подтверждения удаления:
@@ -1385,7 +1385,7 @@ Playwright request user-agent и X-Forwarded-For `192.0.2.5`–`.8`. В осно
 remote browser flow других 429 в Nginx log нет. Это ожидаемый результат security
 проверки, а не причина оставшейся строки.
 
-### Root cause и детерминированное воспроизведение
+#### Root cause и детерминированное воспроизведение
 
 Поиск имеет debounce 300 ms. После изменения текста новый query key начинает
 первый GET, пока confirmation dialog уже открыт. Этот GET ещё не имеет `data`
@@ -1420,7 +1420,7 @@ Fix: после server success сначала `cancelQueries(['finance', owner])
 таймауты, retries и CRUD assertions ради green не ослаблялись. Shell retries также
 установлены в 0. Generated client вручную не редактировался.
 
-### Связь с предыдущим repair и test isolation
+#### Связь с предыдущим repair и test isolation
 
 `git diff 352d4cb HEAD` подтвердил отсутствие изменений в finance mutation helper,
 DeleteConfirmation и обоих старых auth/finance compose specs. Последний repair
@@ -1454,7 +1454,7 @@ run UUID + testId + repeatEachIndex; каждый finance case создаёт с
 cleanup работает в fixture finally, удаляет транзакции перед категориями и проверяет 404. CRUD locator содержит полный уникальный suffix; DELETE привязан к ID полученного
 POST 201. Audit сохраняется; accounts/audit удаляются только вместе с acceptance volume.
 
-### Regression coverage и проверки
+#### Regression coverage и проверки
 
 - Компонентный тест воспроизводит первый незавершённый GET нового фильтра,
   успешный DELETE и поздний устаревший snapshot. До fix — red 0/1; после — строка
@@ -1476,7 +1476,7 @@ Debian Linux aarch64, uid=1000(node), `/private/tmp` отсутствует. Rem
 Ubuntu x86_64; идентичность distro/CPU не заявляется. Production API/Nginx/PostgreSQL
 и versions/CI=1/2 workers/retries=0/setup graph воспроизведены.
 
-### Завершённые финальные checks этой сессии
+#### Завершённые финальные checks этой сессии
 
 После последних production/test изменений выполнены проверки ниже. Изменения
 документации и diagnostic upload workflow затем отдельно проверены форматированием
@@ -1535,7 +1535,7 @@ client и package scripts не менялись. Stage 7 не начат; commit
 Последний опубликованный remote run остаётся FAILED для исходного SHA. Новый remote
 run рабочей копии не запускался; локальные результаты не объявляются remote green.
 
-### Итог stress: 20 последовательных чистых проходов
+#### Итог stress: 20 последовательных чистых проходов
 
 **Passed: 20/20**, точная команда без дополнительных Playwright flags:
 `pnpm --filter @finora/web exec playwright test auth.compose.spec.ts finance.compose.spec.ts`.
@@ -2218,7 +2218,7 @@ Commit и push не выполнены — по прямому ограниче�
 итоговый `FINAL COMPLETE` возможен только после commit и зелёного remote
 GitHub Actions на Linux x86_64 для этого коммита.
 
-## Stage 8 — repair после remote CI FAILED: clean-runner MODULE_NOT_FOUND (2026-09-15)
+### Repair после remote CI FAILED: clean-runner MODULE_NOT_FOUND
 
 Коммит `848c384` («реализовать регулярные операции и завершить Stage 8»),
 описанный выше как `STAGE 8 LOCAL VALIDATION COMPLETE`, был отправлен на
@@ -2238,7 +2238,7 @@ PostgreSQL (`ECONNREFUSED`/`Can't reach database server`/`connect`), а полу
 repair записи выше: red run — реальный, переписывать его задним числом
 объявлением `COMPLETE` неверно.
 
-### Root cause
+#### Root cause
 
 `scripts/recurring-acceptance.mjs` (`recurringOutageAcceptance`) напрямую
 вызывает скомпилированный файл `apps/api/dist-test/test/recurring-scheduler-worker.js`
@@ -2286,7 +2286,7 @@ acceptance-скриптах (`finance-acceptance.mjs`, `budget-acceptance.mjs`,
 `apps/api/dist-test/test/recurring-scheduler-worker.js` в
 `recurringOutageAcceptance`.
 
-### Исправление
+#### Исправление
 
 `scripts/recurring-acceptance.mjs`: добавлена `buildSchedulerWorker()` —
 `rm -rf apps/api/dist-test`, затем `pnpm --filter @finora/api exec tsc -p
@@ -2307,7 +2307,7 @@ tsconfig.test.json` (та же команда компиляции, что и ш
 (`datasource.url` в `prisma.config.ts` падает на `''` без ошибки на этапе
 generate), так что дополнительных env-переменных для job не потребовалось.
 
-### Clean-state воспроизведение и regression evidence
+#### Clean-state воспроизведение и regression evidence
 
 Перед каждым из двух прогонов ниже `apps/api/dist-test` и `apps/web/test-results`
 намеренно удалялись, и `ls apps/api/dist-test` подтверждал отсутствие
@@ -2367,7 +2367,7 @@ Stage 5/6/7/8 regressions не задеты. Ничего не собрано в
 коммит `848c384`); эта запись фиксирует его как есть, а не переписывает
 задним числом.
 
-### Итоговый статус (обновлён)
+#### Итоговый статус (обновлён)
 
 **REMOTE CI FIX READY FOR COMMIT.** Root cause найден и устранён архитектурно
 (acceptance harness сам производит свою build-зависимость на каждом прогоне,
