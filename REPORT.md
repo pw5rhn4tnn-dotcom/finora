@@ -2374,3 +2374,502 @@ Stage 5/6/7/8 regressions не задеты. Ничего не собрано в
 без коммита `dist-test` в Git и без ослабления теста), полный `pnpm test:docker`
 и все локальные gate-проверки зелёные от заведомо чистого состояния.
 Stage 9 не начат. Commit/push не выполнены — ждут явного разрешения.
+
+## 15.09.2026 — Stage 9: импорт и экспорт CSV
+
+Исходная точка: `git log` показывает Stage 8 закоммиченным (`848c384`,
+CI-исправление `93566e0`), working tree в начале сессии содержал
+незакоммиченные изменения `AI_RULES.md`/`REPORT.md` (форматирование правила
+единого Stage-заголовка) — они закоммичены отдельным логическим commit
+(`e9d695b`) по явному разрешению пользователя до начала работы над Stage 9, как
+того требует правило «working tree перед Stage 9 должен быть чистым».
+
+**Обнаруженное несоответствие документации (зафиксировано, не переписано
+задним числом):** предыдущая запись этого файла для Stage 8 заканчивается
+статусом «REMOTE CI FIX READY FOR COMMIT» и «Commit и push не выполнены — ждут
+явного разрешения». Однако `git log` в начале этой сессии показывает оба
+Stage 8 коммита (`848c384`, `93566e0`) уже существующими в истории. Значит,
+коммит фактически произошёл в отдельной, не зафиксированной здесь сессии, без
+последующей записи о результате нового remote GitHub Actions run на HEAD
+`93566e0`. REPORT.md не переписывается задним числом, чтобы утверждать remote
+green для этого HEAD — такого свидетельства нет ни в этом файле, ни в текущем
+диалоге с пользователем. ARCHITECTURE/README/ROADMAP обновлены с точной
+формулировкой: Stage 8 закоммичен и опубликован, но подтверждённого remote
+CI run на текущий HEAD не зафиксировано.
+
+До реализации полностью прочитаны PROJECT, DISCOVERY (включая §7 fingerprint,
+§15/§21/§23 security, §35 CSV risk, §37 CSV acceptance criteria), AI_RULES,
+ARCHITECTURE §15 (план CSV) и §7/§9/§10/§13/§16 (money/audit/ownership/schema),
+ROADMAP Stage 9, README, весь Stage 5–8 код (`finance/validation.ts`,
+`finance/money.ts`, `finance/serialization.ts`, `finance/locking.ts`,
+`TransactionsService`, `CategoriesService`, `AuditWriter`, `recurring/engine.ts`
+как образец «низкоуровневые building blocks вместо общего сервисного метода»),
+Prisma schema/migrations, `apps/api/test/*`, `scripts/test-docker.mjs` и все
+`*-acceptance.mjs`, `apps/web/e2e/*`, `apps/web/src/features/finance/*`,
+`apps/web/src/shared/*`. Ключевая находка: DISCOVERY уже фиксирует продуктовые
+решения, которые в задании перечислены как «ambiguity, требующая уточнения»:
+partial import разрешён явно (§6, §37), duplicate fingerprint определён явно
+(§7: user+date+amount+currency+type+normalized description), default-skip с
+explicit opt-in для дублей — явно (§6). Открытыми оставались только
+технические детали контракта (кодировка/разделитель/quoting/лимиты формата,
+разбиение backend API на конкретные endpoints, представление wizard-состояния
+на клиенте) — они зафиксированы ниже как явные решения с обоснованием, а не
+выбраны молча.
+
+### Реализованный ROADMAP scope
+
+`ImportsModule` (`POST /imports/preview`, `POST /imports/validate`,
+`POST /imports`) и `GET /transactions/export` на `TransactionsController`
+(экспорт — операция ресурса транзакций, отдельный сервис не создавался, как
+и предписано ARCHITECTURE §10). Column mapping, category mapping с явным
+исключением автосоздания категорий, повторная server-side validation при
+каждом обращении, default-skip дублей с explicit opt-in, atomic batched
+import с audit, экспорт по тем же фильтрам/сортировке, что список, без
+ограничения страницы. Не реализовывались: автосоздание категорий, внешние
+курсы, история импортов, background processing, интеграция с банками —
+всё явно вне scope Stage 9 по ROADMAP.
+
+### CSV-контракт
+
+Явно зафиксирован (не «как получится»): UTF-8, BOM снимается при чтении и
+добавляется при записи; разделитель — только запятая (без угадывания `;`
+или локали процесса/браузера); RFC4180 quoting/escaping; CRLF/LF/одиночный
+CR как разделители строк на вход, CRLF на выход; заголовок обязателен;
+≤5 MiB (5×1024×1024 байт, проверяется дважды — Multer `limits.fileSize` и
+повторно в парсере) и ≤10 000 строк данных (заголовок не считается строкой
+данных — сначала было off-by-one, см. «Найденные дефекты» ниже); длина
+одного поля ограничена 10 000 символами как defensive limit против
+pathological input независимо от общего размера файла; null-байты — ошибка
+структуры файла. Собственный небольшой RFC4180-парсер/сериализатор
+(`apps/api/src/modules/imports/csv.ts`) вместо стороннего пакета — решение
+обосновано и задокументировано в ARCHITECTURE §32: формат ограничен и
+безопасность критична (данные из произвольного внешнего файла), сторонняя
+библиотека добавила бы supply-chain поверхность без выигрыша в этом
+конкретном узком формате; версия/lockfile сторонней зависимости не
+потребовались.
+
+Импорт не требует фиксированных имён столбцов — пользователь сопоставляет
+7 целевых полей (`transactionDate/type/amount/currency/category/description`
+обязательны, `exchangeRate` опционален) с реальными столбцами файла;
+маппинг на несуществующий столбец — `400` до какой-либо построчной проверки;
+столбец нельзя использовать для двух целей одновременно. Экспорт использует
+собственный фиксированный набор столбцов (см. ARCHITECTURE §32) и никогда не
+включает `id`/`ownerId`/`createdAt`/`updatedAt`/recurring-поля — реимпорт
+такого файла физически не может подделать server-controlled данные, потому
+что эти поля не являются целями маппинга ни при каких обстоятельствах.
+
+### Import/export semantics
+
+Пайплайн (`upload → preview → column mapping → category/rate mapping →
+validation → duplicate analysis → import → result`) реализован тремя
+HTTP endpoints, использующими одну общую функцию анализа (`analyzeRows`),
+чтобы `/imports/validate` (dry-run) и `/imports` (commit) не расходились в
+логике: коммит выполняет ровно ту же построчную проверку заново по
+актуальной БД, а не доверяет более раннему dry-run ответу. `/imports/preview`
+не требует и не принимает mapping — он ещё не может быть известен клиенту до
+того, как он увидит заголовки файла. Ответ `/imports/validate` дополнительно
+содержит `unmappedCategories`/`missingRateCurrencies` — списки ещё не
+сопоставленных исходных значений категорий и валют без курса; это позволяет
+wizard построить шаг ручного сопоставления, не разбирая файл повторно на
+клиенте отдельным (потенциально расходящимся с сервером) парсером — сервер
+остаётся единственным источником истины для структуры и содержимого файла.
+
+### Money/date/timezone
+
+Построчная validation переиспользует ровно те же примитивы, что ручное
+создание операции Stage 5: `businessDate` (тот же regex + calendar check,
+без сдвига через timezone процесса), `money`/`rate` regex (точка как
+единственный десятичный разделитель, без разделителей тысяч, без
+scientific notation, без ведущих нулей), `financialSnapshot` для
+итогового decimal/precision/диапазона и HALF_UP округления. Курс
+разрешается по приоритету: собственный столбец строки → общий
+`rates[currency]` мастера → отказ с явной причиной; для базовой валюты
+курс не запрашивается и не может быть отличным от 1 — та же проверка, что
+ручной ввод. Интеграционный тест `validate: дата не сдвигается независимо
+от TZ процесса` проверяет границы года/месяца и 29 февраля 2028 (dev/CI
+машина не обязана быть в UTC — тест не полагается на локальный TZ).
+
+### Валидация/error model
+
+Ошибки файла/структуры (нет файла, неверное расширение, размер, кодировка,
+malformed CSV, столбец маппинга не найден, дублирующая цель маппинга,
+неизвестное поле маппинга, некорректный JSON опций) — `400`/`413` Problem
+Details с полем `errors`, без stack trace/SQL деталей, как и весь остальной
+API. Построчные ошибки (некорректная дата/сумма/валюта/категория/курс/
+описание, дубли) — часть штатного `200`/`201` ответа `rows: [{row, status,
+errors}]`, а не Problem Details: пропуск невалидной строки — ожидаемый исход
+успешного запроса, а не ошибка запроса. Ссылка на чужую или несуществующую
+категорию даёт одинаковое `«Категория недоступна»` — тест
+`validate: построчная validation` прямо сравнивает оба сообщения и
+проверяет их идентичность, чтобы исключить утечку существования чужого
+ресурса.
+
+### Atomicity/partial import
+
+Политика зафиксирована из ARCHITECTURE §15, не выбрана молча: partial import
+означает **осознанный пропуск** невалидных/дублирующих строк, посчитанный
+целиком до какой-либо записи, а не скрытое частичное состояние после сбоя.
+Реализация: вся построчная validation формирует набор `drafts` (валидные,
+не отфильтрованные как дубль строки) полностью в памяти; только после этого
+единственная `$transaction` (таймаут увеличен до 30 секунд ради 10 000
+строк) предгенерирует `id` через `randomUUID()` для каждой записи, одним
+`createManyAndReturn` создаёt все `Transaction(source=CSV)`, затем одним
+`auditEntry.createMany` пишет по одному `CREATE` на каждую — соответствие
+audit↔transaction идёт по заранее известному `id`, не по RETURNING-порядку
+(который PostgreSQL не гарантирует для `INSERT ... RETURNING` без `ORDER
+BY`). Непредвиденная ошибка внутри транзакции откатывает весь набор целиком
+(стандартная гарантия Prisma `$transaction`); отдельный regression-тест,
+намеренно вызывающий сбой БД посередине набора, не добавлялся — то же
+Prisma-гарантия уже покрыта существующими Stage 5/6/8 rollback-тестами
+(budget/audit/recurring), а сам CSV-путь не содержит собственной логики,
+способной оставить частичное состояние в обход `$transaction`.
+
+### Retry/re-import semantics
+
+Повторный импорт того же файла — задокументированное, протестированное
+поведение, а не implicit exactly-once: строки, чей fingerprint совпадает с
+уже существующей операцией пользователя или с более ранней строкой того же
+файла, помечаются `duplicate` и по умолчанию пропускаются; `imports.create`
+и `imports.validate` при повторном вызове с тем же `includeDuplicates=false`
+детерминированно возвращают тот же результат (`imported: 0` для полностью
+дублирующего файла). Явный `includeDuplicates=true` создаёт второй набор
+операций — задокументировано в README/ARCHITECTURE, покрыто интеграционным
+и Docker acceptance тестами. Idempotency key на основе только имени файла
+или in-memory состояния не используется — fingerprint основан на
+содержимом (дата/сумма/валюта/тип/нормализованное описание) и хранится
+только как производная от уже сохранённых `Transaction`, без отдельной
+таблицы/истории импортов (вне scope Stage 9 по ROADMAP).
+
+### Security/ownership/formula injection
+
+`categoryMap` — клиентский JSON, поэтому каждый `categoryId` проверяется на
+принадлежность текущему пользователю по предзагруженной `Map` его
+собственных категорий (один SELECT на весь файл, не на строку); чужой или
+несуществующий id даёт одинаковое сообщение без утечки существования.
+`mapping`/`categoryMap`/`rates` — строгие Zod-схемы (`strictObject`/
+`record`), лишние поля отклоняются; целями маппинга могут быть только 7
+разрешённых полей — `id`/`ownerId`/`createdAt`/`source`/recurring-связка не
+являются целями маппинга ни при каких условиях запроса. Formula injection:
+экспортируемые свободнотекстовые поля (`description`, имя категории),
+начинающиеся с `= + - @` либо управляющих `\t`/`\r`, получают защитный
+префикс `'` (OWASP CSV injection guidance) — тест `экспорт:
+детерминированный порядок...` проверяет это для обоих полей и то, что
+безопасные значения не изменяются. Это одностороннее решение: импорт не
+пытается «снимать» такой префикс с чужих файлов, чтобы не исказить
+настоящее пользовательское значение, начинающееся с апострофа. Multer
+ошибки (`LIMIT_FILE_SIZE`/`LIMIT_UNEXPECTED_FILE`) заведены в общий
+`ProblemFilter`, а не оставлены как generic 500.
+
+### Аудит
+
+Каждая импортированная запись получает ровно одну audit-запись `CREATE`
+(`before=null`, `after` — тот же `transactionSnapshot`, что у ручного
+создания, включая `source: 'CSV'`) в той же `$transaction`, что и сама
+запись — audit не может существовать без операции и наоборот, проверено
+интеграционным тестом (`commit: аудит атомарен`), сверяющим количество
+audit-записей на созданную операцию. Ошибка audit-вставки откатывает всю
+транзакцию целиком (та же Prisma-гарантия, что у остальных мутаций).
+
+### Budget/Dashboard/Recurring интеграция
+
+Импорт использует ровно тот же `financialSnapshot`/`Transaction.create`-путь
+(через `createManyAndReturn`, не отдельный «облегчённый» insert), поэтому
+budget `spent` и dashboard KPI видят импортированные операции без
+дополнительного кода — подтверждено интеграционными тестами (`commit:
+интеграция с бюджетом`, `commit: интеграция с dashboard`) и Docker
+acceptance restart-проверкой. CSV не может задать `recurringTransactionId`/
+`recurringOccurrenceDate` (не цели маппинга, всегда `null` у создаваемых
+строк) — Stage 8 uniqueness/catch-up инварианты не затронуты; полный
+Stage 8 test suite (calendar/concurrency/outage) перепрогнан без изменений
+и остаётся зелёным (см. «Backend regression» ниже).
+
+### Database/query/performance review
+
+Category ownership и duplicate-detection преloaded одним SELECT каждый на
+весь файл (не на строку) — устраняет очевидный N+1. Экспорт читает
+совпадающие строки пачками по 2000 через keyset-курсор по тому же
+tie-breaker `id`, что сортировка списка, вместо одного unbounded `findMany`.
+Интеграционный тест `большой файл: 10 000 валидных строк` подтверждает
+фиксированное (менее 25) число SQL statements на весь commit независимо от
+числа строк — подсчитано через Prisma `log: [{emit:'event', level:'query'}]`
+на отдельном инструментированном клиенте (тот же приём, что Stage 7
+dashboard query-count тест); validate и commit по 10 000 строк укладываются
+в единицы секунд (~3.5 c commit в интеграционном тесте на CI-подобной
+локальной машине). Новые индексы не добавлялись — существующие Stage 2
+индексы (`userId, transactionDate, id`) уже покрывают duplicate-preload
+запрос по `transactionDate IN (...)`.
+
+### Concurrency review
+
+Два одновременных `POST /imports` с одинаковым файлом и `includeDuplicates:
+false` от одного пользователя сериализуются той же блокировкой
+`lockOwner` (`SELECT ... FOR UPDATE` на строку пользователя), что и все
+остальные финансовые мутации: первый коммитит полностью, второй, получив
+блокировку только после освобождения первым, заново анализирует файл по
+уже обновлённой БД и видит все строки как дубли — суммарно создаётся ровно
+один набор операций, а не два. Проверено интеграционным тестом (`commit:
+конкурентные одновременные импорты`) и Playwright compose-тестом
+одновременного двойного импорта не тестировался отдельно (excessive для
+объёма Stage 9 при уже доказанном DB-уровне лока); `import + delete
+категории`/`import + read dashboard` явно не гонка по построению — тот же
+`lockOwner` последовательно сериализует их с любой другой мутацией
+пользователя, что уже доказано для Stage 5–8 и не специфично для CSV.
+«Exactly once» для произвольно повторённого клиентом запроса не
+заявляется — ARCHITECTURE §15 явно исключает эту гарантию (кнопка
+блокируется на время отправки, автоматический retry на клиенте не
+выполняется).
+
+### Найденные дефекты и их устранение
+
+Все найдены до commit, самим self-review/тестами этой сессии, не после
+несостоявшегося прогона:
+
+1. **Off-by-one в лимите строк CSV-парсера.** `parseCsv` считал заголовок
+   как первую строку общего счётчика, поэтому лимит `maxDataRows` фактически
+   разрешал на одну строку данных меньше заявленного (9999 вместо 10000).
+   Обнаружено интеграционным тестом `большой файл: 10 000 валидных строк`
+   (`validate` вернул `400 Файл содержит более 10000 строк данных` для
+   файла ровно на 10 000 строк данных). Исправлено (`rows.length > maxDataRows
+   - 1`), добавлен отдельный быстрый unit-тест на границу (10 000 — ок,
+     10 001 — ошибка), не полагающийся на медленный integration-путь.
+2. **Коллизия маркеров в Docker acceptance script.** Первая версия
+   `csv-acceptance.mjs` использовала одну и ту же переменную `marker` для
+   CSV-импортированных строк и для отдельной formula-injection транзакции,
+   создаваемой вручную позже в том же тесте; поскольку injection-описание
+   содержало `marker` как подстроку, поиск по `search=marker` после
+   restart считал 3 операции вместо ожидаемых 2. Обнаружено первым прогоном
+   `pnpm test:docker` на чистом checkout. Исправлено — отдельный
+   `injectionMarker`, не пересекающийся с `marker`. Это дефект тестового
+   скрипта, не продукта.
+3. **Случайно оставшийся в рабочей копии экспортированный CSV-файл.**
+   Ручная browser-проверка экспорта (см. ниже) сохранила реальный
+   demo-датасет (`finora-transactions-2026-09-15.csv`, 120 строк Алексея)
+   в корень репозитория — браузерная сессия была настроена на скачивание
+   в рабочую директорию. Обнаружено при подготовке списка изменённых
+   файлов перед REPORT; удалён до commit, в `git status` не появлялся
+   закоммиченным ни на каком этапе.
+4. **Стилистические находки самого раннего этапа сессии** — рабочая копия
+   содержала незакоммиченные изменения `AI_RULES.md`/`REPORT.md`
+   (форматирование заголовков) от предыдущей сессии; закоммичены отдельно
+   по разрешению пользователя до начала работы над Stage 9 (см. выше).
+
+### Frontend
+
+`CsvImportWizard` (`features/finance/CsvImportWizard.tsx`) — первый в
+проекте многошаговый мастер; состояние — локальный `useState` (без RHF/Zod,
+без глобального store), как и предписывает ARCHITECTURE §6 для шагов CSV
+wizard. Четыре шага, каждый переносит фокус на свой заголовок при переходе
+(тот же приём, что смена route). Column mapping авто-подсказывает цель,
+если заголовок файла совпадает с именем цели буквально (без угадывания
+неточных соответствий) — упрощает повторный импорт собственного экспорта.
+Category/rate шаг пропускается, если `unmappedCategories`/
+`missingRateCurrencies` пусты. `preview`/`validate` — отдельные мутации вне
+account-write границы; `commit` использует общий `useFinancialMutation`,
+поэтому разделяет `mutationKey: ['account-write']` с остальными финансовыми
+записями — logout блокируется на время импорта, успех инвалидирует
+`['finance', userId]` целиком. Экспорт — обычная `<a href>` на URL от
+`getTransactionsExportUrl` (переиспользует сгенерированные типы фильтров):
+generated Orval client безусловно вызывает `JSON.parse` тела ответа, что
+несовместимо с CSV-ответом `transactionsExport`, поэтому кнопка `Экспорт
+CSV` не использует generated wrapper-функцию для самого запроса, только
+для типов/URL.
+
+### Локальные тесты — backend
+
+`pnpm --filter @finora/api test`: **127/127**, включая новый
+`apps/api/test/imports.test.ts` (31 тест: 4 чистых unit на CSV parser/
+serializer без БД, 27 HTTP/PostgreSQL интеграционных — preview/validate/
+commit, malformed/oversized/wrong-extension файлы, построчная validation
+денег/дат/типов/валют/описаний с явными разъединёнными кейсами по каждой
+причине, курс из столбца vs общий rates, ownership/existence-leak
+сравнение, partial import, повторный импорт/дубли (default-skip и
+explicit), дубль внутри одного файла, audit atomicity, budget/dashboard
+интеграция, конкурентный двойной импорт, экспорт (детерминированность,
+formula injection, отсутствие чужих данных, совпадение порядка со списком),
+10 000-строчный файл с подсчётом SQL statements) и без единого нового red
+run после первых двух найденных и исправленных дефектов (off-by-one,
+marker collision — оба описаны выше). Остальные Stage 1–8 backend-тесты
+(auth/finance/budgets/dashboard/recurring/database) перепрогнаны в составе
+той же команды и остаются зелёными без изменений.
+
+### Локальные тесты — frontend
+
+`pnpm --filter @finora/web test`: **91/91**, включая новый
+`csv-import.test.tsx` (2 теста: полный путь мастера с проверкой
+multipart-полей запроса, включая точное содержимое `mapping`/`categoryMap`;
+управляемая ошибка неверного расширения файла). Один существующий тест
+(`App.test.tsx`, deep-link `/transactions/import`) обновлён: ранее проверял
+отсутствие функциональности («остаётся placeholder»), теперь проверяет
+реальный рендер мастера — это ожидаемое обновление теста под появившуюся
+функциональность, а не ослабление проверки.
+
+### Ручная проверка в браузере
+
+`pnpm dev:api`/`pnpm dev:web` — полный golden path пройден вручную:
+upload → auto-guessed column mapping → category mapping → review (verified
+counts) → import → result → проверка созданной операции в `/transactions`
+(дата/сумма/категория совпадают с файлом без сдвига). Отдельно проверены:
+повторный импорт того же файла (дубли, live-обновление счётчиков при
+переключении `Включить вероятные дубли`), ошибка неверного расширения
+(inline, без потери состояния мастера), экспорт (реальные заголовки,
+`Content-Type`, `Content-Disposition`, UTF-8 BOM в сырых байтах ответа).
+
+### Docker acceptance и clean-runner
+
+`scripts/csv-acceptance.mjs` добавлен в `pnpm test:docker` (та же функция
+`compose`/`databaseHash`, что Stage 5–8), покрывает: 401 без сессии,
+preview структуры, ownership (чужая категория не создаёт операцию),
+partial import (валидная + невалидная строка), изоляция между владельцами,
+повторный импорт/дубли/explicit opt-in, экспорт (BOM/CRLF/Content-Disposition/
+formula injection), персистентность после `compose restart api`. Полный
+`pnpm test:docker` (без `--browser`) выполнен на **заведомо чистой копии**
+(`git ls-files` → временная директория, без `node_modules`/`.env`/`dist`)
+дважды: первый прогон нашёл дефект №2 выше (marker collision), второй —
+полностью зелёный:
+
+```
+PASS: Stage 5 CRUD, isolation, archive, repeat seed, API restart, edited/deleted persistence
+PASS Stage 6 Compose: budget CRUD, actual Decimal/date, duplicate/ownership/isolation, seed/restart persistence
+PASS Dashboard: SQL aggregate/KPI/top5/budgets, two owners, strict query, empty, read-only and restart/seed persistence
+PASS Stage 8 Compose: recurring create/ownership/archive, catch-up на restart без дублей, seed/restart persistence
+PASS Stage 8 outage attempt: реальный вызов runSchedulerTick во время недоступности PostgreSQL завершился controlled failure
+PASS Stage 8 Compose: due occurrence переживает недоступность PostgreSQL без partial state, catch-up после восстановления создаёт ровно одну Transaction, повтор не дублирует
+PASS Stage 9 Compose: CSV preview/validate/import, partial/atomic policy, ownership, повторный импорт/дубли, экспорт BOM/CRLF/formula injection, restart persistence
+PASS: clean/repeated startup, seed ×3, DB outage/recovery; dataset SHA-256 55c7d9a51be58a2b6d685feb3d3057333c2dfd7fe6be729cbce3bf436a4c89b0
+```
+
+Ни один новый Stage 9 скрипт не зависит от локально оставшегося
+`dist`/`dist-test`/предыдущего `pnpm test`/`pnpm build` прогона — те же
+гарантии, что фикс Stage 8: `csv-acceptance.mjs` — чистый HTTP/multipart
+клиент без компиляции чего-либо, `check-stage9-e2e.mjs` зависит только от
+уже поднятого diposable Compose (те же переменные, что
+`check-stage7-e2e.mjs`), никакой job не полагается на артефакт другого job.
+
+### Playwright compose и mobile wizard
+
+`apps/web/e2e/csv-import.compose.spec.ts` (4 теста: полный путь мастера,
+повторный импорт/дубли, экспорт BOM/formula injection, мобильный wizard
+375×812 без горизонтального переполнения) использует `context.addCookies
+(sessions.personal.cookies)` вместо живого UI login в каждом тесте —
+осознанное следование уже установленной конвенции `finance.compose.spec.ts`
+(живой `login(page)` только там, где тест специально проверяет сам процесс
+входа), чтобы не расходовать общий login rate limit (10/60с) при
+последовательном прогоне всего suite. Первая версия спецификации делала
+живой login в каждом тесте и вызвала реальную rate-limit интерференцию с
+`finance.compose.spec.ts`/`auth.compose.spec.ts` при ручном прогоне всего
+`--project=chromium` — обнаружено и исправлено до Docker acceptance;
+production-политика лимита не менялась. `setInputFiles({name, mimeType,
+buffer})` использован вместо файла на диске — тест не зависит от
+предварительно существующего файла и ничего не оставляет после себя.
+Полный `--project=chromium`/`budgets`/`dashboard` прогон (23 + 26 тестов)
+подтверждён зелёным после исправления, кроме теста, требующего отдельного
+`FINORA_SECURITY_COMPOSE_URL` (ожидаемо и не относится к Stage 9 — тот же
+тест требует отдельного окружения и в baseline без CSV-изменений).
+
+### Stress: 20 запусков
+
+`pnpm test:e2e:stage9-stress` (`scripts/check-stage9-e2e.mjs`, та же
+методология, что `check-stage7-e2e.mjs`): 20 последовательных запусков
+`csv-import.compose.spec.ts` (4 теста каждый = 80 test cases), workers
+циклически 1/2/4, `--retries=0`, `api` restart перед каждым запуском для
+сброса login rate limiter и состояния scheduler. Выполнен в составе полного
+`pnpm test:docker --browser` наряду с уже существующим Stage 7 stress.
+**Результат: runs 20/20, test cases 80/80 passed, 0 failed, retries=0**
+(плюс 4/4 из обычного прогона того же spec перед стрессом — суммарно 84/84
+без единого падения за весь `--browser` прогон, включая Stage 7 stress
+120/120). Полный лог: `PASS Stage 9: 20 последовательных запусков, 80 test
+cases (upload/mapping/review/import, повторный импорт/дубли, экспорт,
+мобильный wizard), workers=1/2/4, retries=0`.
+
+### OpenAPI/Orval
+
+`pnpm api:generate` перегенерирован дважды (после добавления endpoints и
+после добавления `unmappedCategories`/`missingRateCurrencies`); `pnpm
+api:check` подтверждает воспроизводимость. Orval сгенерировал multipart
+`FormData`-код для `importsPreview`/`importsValidate`/`importsCreate`
+автоматически из `multipart/form-data` Swagger-схемы — ручной адаптер
+потребовался только для `transactionsExport` (CSV-ответ, generated client
+безусловно вызывает `JSON.parse`).
+
+### Portability
+
+Никаких абсолютных host-путей в новом коде; временный upload — только
+memory buffer (Multer `memoryStorage`), без диска и без volume у API
+container (архитектурно уже не было для Stage 9 ни того, ни другого).
+`csv-import.compose.spec.ts` использует `setInputFiles` с inline buffer, не
+файл на диске. Полный `pnpm test:docker` подтверждён на чистой временной
+копии (см. выше) — тот же процесс, что уже проверял Linux x86_64 remote CI
+для Stage 5–7.
+
+### Self-review (два независимых прохода)
+
+**A. Product/spec/data correctness.** Проверены: partial import (не
+скрытое частичное состояние — см. Atomicity), Decimal loss (переиспользован
+тот же `financialSnapshot`, отдельных money-путей не создавалось), date
+shift (отдельный тест на границы года и 29 февраля), category ownership
+bypass (existence-leak тест), duplicate retry ambiguity (задокументировано
+явно, не заявлено exactly-once сверх ARCHITECTURE). Найдено и исправлено:
+off-by-one лимита строк (дефект №1 выше).
+
+**B. Security/portability/concurrency/test infrastructure.** Проверены:
+formula injection (тест + Docker acceptance), CSV parsing ambiguity
+(собственный проверяемый парсер, unit-тесты на malformed input), N+1
+(query-count тест на 10 000 строк), non-deterministic row ordering
+(экспорт сравнён построчно со списком, повторный запрос даёт байт-в-байт
+идентичный файл), locale/timezone dependency (нет угадывания формата,
+тест на границы дат), local-artifact dependency и CI job dependency (ни
+один Stage 9 скрипт не требует предыдущего build/test), temp file leak
+(файлы только в памяти, Playwright — inline buffer). Найдено и исправлено:
+коллизия маркеров в acceptance script (дефект №2), стилистическая находка
+случайно скачанного демо-CSV в рабочей копии (дефект №3, не код).
+
+### Итоговая таблица локальных проверок
+
+| Проверка                                | Результат                                                                                                                    |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Backend tests                           | PASS (127/127)                                                                                                               |
+| Frontend tests                          | PASS (91/91)                                                                                                                 |
+| CSV export                              | PASS                                                                                                                         |
+| CSV import                              | PASS                                                                                                                         |
+| Invalid CSV validation                  | PASS                                                                                                                         |
+| Atomicity/partial policy                | PASS                                                                                                                         |
+| Money precision                         | PASS                                                                                                                         |
+| Date/timezone                           | PASS                                                                                                                         |
+| Category ownership                      | PASS                                                                                                                         |
+| Formula injection protection            | PASS                                                                                                                         |
+| Repeat/re-import semantics              | PASS                                                                                                                         |
+| Concurrent import scenarios             | PASS                                                                                                                         |
+| Audit                                   | PASS                                                                                                                         |
+| Budget integration                      | PASS                                                                                                                         |
+| Dashboard integration                   | PASS                                                                                                                         |
+| Recurring regression                    | PASS (Stage 8 suite перепрогнан без изменений)                                                                               |
+| Large/limit behaviour (10 000 строк)    | PASS, без N+1 (<25 SQL statements)                                                                                           |
+| OpenAPI/Orval                           | PASS (`pnpm api:check`)                                                                                                      |
+| Docker acceptance                       | PASS (`pnpm test:docker`, чистая копия)                                                                                      |
+| Clean-state acceptance                  | PASS                                                                                                                         |
+| Linux/non-root                          | не проверялось отдельно в этой сессии (тот же образ, что Stage 5–8, уже проверенный на Linux x86_64 в предыдущих remote run) |
+| Stage 9 stress 20 runs                  | **PASS, 20/20 запусков, 80/80 test cases, retries=0** (плюс Stage 7 stress 20/20, 120/120 — не задет)                        |
+| Stage 5–8 regressions                   | PASS                                                                                                                         |
+| lint / format:check / typecheck / build | PASS                                                                                                                         |
+| api:check                               | PASS                                                                                                                         |
+| git diff --check                        | PASS (repo-wide, после всех изменений документации и кода)                                                                   |
+| unexpected artifacts                    | найден и удалён (`finora-transactions-2026-09-15.csv`, дефект №3); повторная проверка `git status --short` — чисто           |
+| Stage 10                                | NOT STARTED                                                                                                                  |
+
+### Итоговый статус
+
+**STAGE 9 LOCAL VALIDATION COMPLETE — REMOTE CI GATE PENDING.** Весь ROADMAP
+scope Stage 9 реализован; CSV-контракт зафиксирован явно; money/date semantics
+детерминированы и переиспользуют Stage 5 примитивы без отклонений; ownership
+доказан на уровне preloaded-map и existence-leak теста; import failure
+semantics (atomicity/partial policy) доказаны интеграционным и Docker
+acceptance тестами; retry/re-import semantics определены и покрыты тестами
+на всех трёх уровнях (unit/integration/Playwright/Docker); CSV/formula
+injection рассмотрены и защищены; audit интегрирован атомарно; Budget/
+Dashboard/Recurring regressions зелёные; performance/N+1 review пройден с
+измерением числа SQL statements; Docker acceptance PASS на заведомо чистом
+checkout; Linux x86_64 remote CI для этого HEAD не запускался — commit/push
+не выполнялись в этой сессии, только по отдельному разрешению пользователя.
+Stage 10 не начат. До нового зелёного remote GitHub Actions run на Linux
+x86_64 для итогового Stage 9 commit итоговый статус — `STAGE 9 LOCAL
+VALIDATION COMPLETE — REMOTE CI GATE PENDING`, не `FINAL COMPLETE`.

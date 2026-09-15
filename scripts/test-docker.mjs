@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { financeAcceptance } from './finance-acceptance.mjs';
 import { dashboardAcceptance } from './dashboard-acceptance.mjs';
 import { budgetAcceptance } from './budget-acceptance.mjs';
+import { csvAcceptance } from './csv-acceptance.mjs';
 import {
   recurringAcceptance,
   recurringOutageAcceptance,
@@ -206,6 +207,7 @@ try {
   await dashboardAcceptance(financeUrl, compose, databaseHash);
   await recurringAcceptance(financeUrl, compose, databaseHash);
   await recurringOutageAcceptance(financeUrl, compose, env);
+  await csvAcceptance(financeUrl, compose, databaseHash);
   if (process.argv.includes('--browser')) {
     const resultsRoot = resolve('apps/web/test-results');
     await mkdir(resultsRoot, { recursive: true });
@@ -284,6 +286,36 @@ try {
       },
     );
     console.log(dashboard.stdout);
+    await compose('restart', 'api');
+    await compose('up', '-d', '--wait', '--wait-timeout', '180');
+    const csvImport = await exec(
+      'pnpm',
+      [
+        '--filter',
+        '@finora/web',
+        'exec',
+        'playwright',
+        'test',
+        'csv-import.compose.spec.ts',
+      ],
+      {
+        env: { ...browserEnv, FINORA_COMPOSE_URL: browserUrl },
+        maxBuffer: 16 * 1024 * 1024,
+        timeout: 300000,
+      },
+    );
+    console.log(csvImport.stdout);
+    const stress9 = await exec('node', ['scripts/check-stage9-e2e.mjs'], {
+      env: {
+        ...browserEnv,
+        FINORA_COMPOSE_URL: browserUrl,
+        FINORA_STRESS_COMPOSE_PROJECT: project,
+        FINORA_STRESS_COMPOSE_DIR: checkout,
+      },
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 1200000,
+    });
+    console.log(stress9.stdout);
     const stress = await exec('node', ['scripts/check-stage7-e2e.mjs'], {
       env: {
         ...browserEnv,

@@ -7,6 +7,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module.j
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { BudgetsModule } from './modules/budgets/budgets.module.js';
 import { RecurringModule } from './modules/recurring/recurring.module.js';
+import { ImportsModule } from './modules/imports/imports.module.js';
 @Module({
   imports: [
     HealthModule,
@@ -16,6 +17,7 @@ import { RecurringModule } from './modules/recurring/recurring.module.js';
     BudgetsModule,
     RecurringModule,
     DashboardModule,
+    ImportsModule,
   ],
 })
 export class AppModule {}

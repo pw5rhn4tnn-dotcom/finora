@@ -9,7 +9,15 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
+import multer from 'multer';
 import type { ServerResponse } from 'node:http';
+
+const { MulterError } = multer;
+
+const multerMessages: Record<string, string> = {
+  LIMIT_FILE_SIZE: 'Файл превышает допустимый размер',
+  LIMIT_UNEXPECTED_FILE: 'Ожидается ровно один файл в поле file',
+};
 
 export class ProblemDto {
   @ApiProperty({ description: 'Категория ошибки', example: 'internal_error' })
@@ -29,8 +37,24 @@ export class ProblemDto {
 @Catch()
 export class ProblemFilter implements ExceptionFilter {
   private readonly logger = new Logger(ProblemFilter.name);
-  catch(error: unknown, host: ArgumentsHost) {
+  catch(rawError: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<ServerResponse>();
+    // Multer выбрасывает собственный класс ошибки (не HttpException) при
+    // превышении лимита файла/неожиданном поле; переводим её в тот же Problem
+    // контракт, что и остальные пользовательские ошибки загрузки.
+    const error: unknown =
+      rawError instanceof MulterError
+        ? new Problem(
+            rawError.code === 'LIMIT_FILE_SIZE' ? 413 : 400,
+            'validation_error',
+            multerMessages[rawError.code] ?? 'Некорректная загрузка файла',
+            {
+              file: [
+                multerMessages[rawError.code] ?? 'Некорректная загрузка файла',
+              ],
+            },
+          )
+        : rawError;
     const parserStatus =
       error && typeof error === 'object' && 'type' in error
         ? error.type === 'entity.too.large'

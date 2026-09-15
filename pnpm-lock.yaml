@@ -217,6 +217,9 @@ importers:
       jose:
         specifier: 6.2.12
         version: 6.2.12
+      multer:
+        specifier: 2.2.0
+        version: 2.2.0
       pg:
         specifier: 8.23.0
         version: 8.23.0
@@ -239,6 +242,9 @@ importers:
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
+      '@types/multer':
+        specifier: 2.2.0
+        version: 2.2.0
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
@@ -320,7 +326,7 @@ importers:
     devDependencies:
       orval:
         specifier: 8.33.0
-        version: 8.33.0(effect@3.20.0)(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2)
+        version: 8.33.0(@tanstack/react-query@5.102.8(react@19.3.0))(effect@3.20.0)(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2)
 
 packages:
 
@@ -1800,6 +1806,9 @@ packages:
 
   '@types/lodash@4.17.25':
     resolution: {integrity: sha512-+K1NIO8I+F9/wNulfVvu23QYd0Pe9/OCqRrim4NoYIf1VoEDL90Ve4ClzpyqBLc7NpGGWRvYNCKZ1BE/Jpf8dQ==}
+
+  '@types/multer@2.2.0':
+    resolution: {integrity: sha512-3U1troeqGV8Ntp7Q3klwf4zr23VEoqYVocYXaswm9+8z3O9UHDYAqLxjJ/h550iRADTjKdOdhhasXw6gD6kYtg==}
 
   '@types/node@24.13.4':
     resolution: {integrity: sha512-YJ7EqCstVTzIr0fMr7qul/977en+pQHrfmuKIo6Zr9i75Be21dr3MovcfvGtyvi2HAUrRerWps5sMO9I7WaxDw==}
@@ -4701,11 +4710,13 @@ snapshots:
       - supports-color
       - typescript
 
-  '@orval/query@8.33.0(supports-color@8.1.1)(typescript@6.0.3)':
+  '@orval/query@8.33.0(@tanstack/react-query@5.102.8(react@19.3.0))(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@orval/core': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
       '@orval/fetch': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
       remeda: 2.48.0
+    optionalDependencies:
+      '@tanstack/react-query': 5.102.8(react@19.3.0)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
@@ -5344,6 +5355,10 @@ snapshots:
   '@types/json-schema@7.0.15': {}
 
   '@types/lodash@4.17.25': {}
+
+  '@types/multer@2.2.0':
+    dependencies:
+      '@types/express': 5.0.6
 
   '@types/node@24.13.4':
     dependencies:
@@ -6713,7 +6728,7 @@ snapshots:
       stdin-discarder: 0.3.2
       string-width: 8.2.2
 
-  orval@8.33.0(effect@3.20.0)(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2):
+  orval@8.33.0(@tanstack/react-query@5.102.8(react@19.3.0))(effect@3.20.0)(prettier@3.9.6)(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
       '@orval/angular': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
@@ -6725,7 +6740,7 @@ snapshots:
       '@orval/mcp': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2)
       '@orval/mock': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
       '@orval/pinia-colada': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
-      '@orval/query': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
+      '@orval/query': 8.33.0(@tanstack/react-query@5.102.8(react@19.3.0))(supports-color@8.1.1)(typescript@6.0.3)
       '@orval/solid-start': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
       '@orval/swr': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)
       '@orval/zod': 8.33.0(supports-color@8.1.1)(typescript@6.0.3)(zod@4.6.2)

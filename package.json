@@ -27,7 +27,8 @@
     "test:e2e": "pnpm --filter @finora/web test:e2e",
     "test:e2e:auth": "node scripts/test-docker.mjs --browser",
     "test:e2e:stage6-regression": "node scripts/check-stage6-e2e.mjs",
-    "test:e2e:stage7-stress": "node scripts/check-stage7-e2e.mjs"
+    "test:e2e:stage7-stress": "node scripts/check-stage7-e2e.mjs",
+    "test:e2e:stage9-stress": "node scripts/check-stage9-e2e.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

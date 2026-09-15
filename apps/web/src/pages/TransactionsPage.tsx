@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { ActiveFinanceSheet } from '../features/finance/ActiveFinanceSheet';
 import type { ActiveAction } from '../features/finance/active-action';
 import { useAuth } from '../features/auth/auth-context';
@@ -7,9 +8,10 @@ import { TransactionFilters } from '../features/finance/TransactionFilters';
 import { useExplorerParams } from '../features/finance/explorer-params';
 import { TransactionList } from '../features/finance/TransactionList';
 import { Pagination } from '../features/finance/Pagination';
+import { exportHref } from '../features/finance/csv-export';
 import { PageContainer, PageHeader, Card } from '../shared/ui/Surface';
 import { LoadingState, ErrorState, EmptyState } from '../shared/ui/States';
-import { Button } from '../shared/ui/Button';
+import { Button, ButtonLink } from '../shared/ui/Button';
 import { safeError } from '../shared/api/client';
 export function TransactionsPage() {
   const user = useAuth().data;
@@ -35,6 +37,17 @@ function Explorer({ baseCurrency }: { baseCurrency: string }) {
       Добавить операцию
     </Button>
   );
+  const headerActions = (
+    <>
+      <ButtonLink variant="secondary">
+        <Link to="/transactions/import">Импорт CSV</Link>
+      </ButtonLink>
+      <ButtonLink variant="secondary">
+        <a href={exportHref(params)}>Экспорт CSV</a>
+      </ButtonLink>
+      {addButton}
+    </>
+  );
   const filtered = [
     'search',
     'type',
@@ -50,7 +63,7 @@ function Explorer({ baseCurrency }: { baseCurrency: string }) {
       <PageHeader
         title="Транзакции"
         description="История доходов и расходов в одном месте."
-        action={addButton}
+        action={headerActions}
       />
       <p role="status" className="finance-notice">
         {notice}

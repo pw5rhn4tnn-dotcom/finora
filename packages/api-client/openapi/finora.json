@@ -1884,6 +1884,207 @@
         ]
       }
     },
+    "/api/v1/transactions/export": {
+      "get": {
+        "operationId": "transactionsExport",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Буквальный поиск без регистра по описанию и категории; пробелы по краям удаляются",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Тип операции",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "INCOME",
+                "EXPENSE"
+              ]
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Категория, включая архивную",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Начальная дата включительно",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Конечная дата включительно",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "amountMin",
+            "required": false,
+            "in": "query",
+            "description": "Минимум в основной валюте",
+            "schema": {
+              "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "amountMax",
+            "required": false,
+            "in": "query",
+            "description": "Максимум в основной валюте",
+            "schema": {
+              "pattern": "^(0|[1-9][0-9]{0,15})(\\.[0-9]{1,8})?$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Исходная валюта из /settings/options",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Порядок; суммы в основной валюте, стабильный дополнительный порядок по id",
+            "schema": {
+              "default": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest",
+                "amountDesc",
+                "amountAsc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV-файл, UTF-8 с BOM, CRLF"
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Экспортировать в CSV все записи по текущим фильтрам без ограничения страницы",
+        "tags": [
+          "Транзакции"
+        ]
+      }
+    },
     "/api/v1/transactions/{id}": {
       "get": {
         "operationId": "transactionsGet",
@@ -3599,6 +3800,423 @@
           "Обзор"
         ]
       }
+    },
+    "/api/v1/imports/preview": {
+      "post": {
+        "operationId": "importsPreview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV-файл, UTF-8, до 5 МБ"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Разобрать файл и вернуть столбцы/пример строк без валидации",
+        "tags": [
+          "Импорт CSV"
+        ]
+      }
+    },
+    "/api/v1/imports/validate": {
+      "post": {
+        "operationId": "importsValidate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV-файл, UTF-8, до 5 МБ"
+                  },
+                  "mapping": {
+                    "type": "string",
+                    "description": "JSON: соответствие целей (transactionDate/type/amount/currency/exchangeRate?/category/description) заголовкам столбцов файла"
+                  },
+                  "categoryMap": {
+                    "type": "string",
+                    "description": "JSON: соответствие исходных значений категории собственным categoryId"
+                  },
+                  "rates": {
+                    "type": "string",
+                    "description": "JSON: курс к основной валюте по коду валюты для строк без курса в файле"
+                  },
+                  "includeDuplicates": {
+                    "type": "string",
+                    "description": "\"true\" разрешает импорт строк, отмеченных как вероятные дубли",
+                    "default": "false"
+                  }
+                },
+                "required": [
+                  "file",
+                  "mapping"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAnalysisDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Проверить файл с маппингом без записи в БД: построчная validation и duplicate analysis",
+        "tags": [
+          "Импорт CSV"
+        ]
+      }
+    },
+    "/api/v1/imports": {
+      "post": {
+        "operationId": "importsCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "CSV-файл, UTF-8, до 5 МБ"
+                  },
+                  "mapping": {
+                    "type": "string",
+                    "description": "JSON: соответствие целей (transactionDate/type/amount/currency/exchangeRate?/category/description) заголовкам столбцов файла"
+                  },
+                  "categoryMap": {
+                    "type": "string",
+                    "description": "JSON: соответствие исходных значений категории собственным categoryId"
+                  },
+                  "rates": {
+                    "type": "string",
+                    "description": "JSON: курс к основной валюте по коду валюты для строк без курса в файле"
+                  },
+                  "includeDuplicates": {
+                    "type": "string",
+                    "description": "\"true\" разрешает импорт строк, отмеченных как вероятные дубли",
+                    "default": "false"
+                  }
+                },
+                "required": [
+                  "file",
+                  "mapping"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ошибка запроса; 429 содержит Retry-After в секундах",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ],
+        "summary": "Повторить validation по актуальной БД и атомарно импортировать валидные строки с аудитом",
+        "tags": [
+          "Импорт CSV"
+        ]
+      }
     }
   },
   "info": {
@@ -4976,6 +5594,191 @@
           "budgets",
           "insights",
           "upcomingRecurring"
+        ]
+      },
+      "ImportPreviewDto": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "description": "Заголовки столбцов файла в исходном порядке",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sampleRows": {
+            "type": "array",
+            "description": "Первые строки данных файла для предпросмотра маппинга",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "totalRows": {
+            "type": "number",
+            "description": "Всего строк данных в файле (без заголовка)"
+          }
+        },
+        "required": [
+          "columns",
+          "sampleRows",
+          "totalRows"
+        ]
+      },
+      "ImportRowErrorDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Поле цели маппинга, к которому относится ошибка"
+          },
+          "message": {
+            "type": "string",
+            "description": "Читаемое описание ошибки"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ]
+      },
+      "ImportRowResultDto": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "number",
+            "description": "Номер строки данных файла, начиная с 1"
+          },
+          "status": {
+            "type": "string",
+            "description": "valid — будет импортирована; invalid — пропущена по ошибке; duplicate — пропущена как вероятный дубль",
+            "enum": [
+              "valid",
+              "invalid",
+              "duplicate"
+            ]
+          },
+          "errors": {
+            "description": "Ошибки строки",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowErrorDto"
+            }
+          }
+        },
+        "required": [
+          "row",
+          "status",
+          "errors"
+        ]
+      },
+      "ImportAnalysisDto": {
+        "type": "object",
+        "properties": {
+          "totalRows": {
+            "type": "number",
+            "description": "Всего строк данных в файле"
+          },
+          "importableRows": {
+            "type": "number",
+            "description": "Строк, готовых к импорту"
+          },
+          "duplicateRows": {
+            "type": "number",
+            "description": "Строк, пропущенных как вероятные дубли"
+          },
+          "invalidRows": {
+            "type": "number",
+            "description": "Строк, пропущенных по ошибкам валидации"
+          },
+          "rows": {
+            "description": "Результат по каждой строке",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowResultDto"
+            }
+          },
+          "unmappedCategories": {
+            "description": "Уникальные исходные значения категории без сопоставления в categoryMap — для шага category mapping мастера",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingRateCurrencies": {
+            "description": "Валюты, для которых в файле или в rates не хватает курса к основной валюте",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "totalRows",
+          "importableRows",
+          "duplicateRows",
+          "invalidRows",
+          "rows",
+          "unmappedCategories",
+          "missingRateCurrencies"
+        ]
+      },
+      "ImportResultDto": {
+        "type": "object",
+        "properties": {
+          "totalRows": {
+            "type": "number",
+            "description": "Всего строк данных в файле"
+          },
+          "importableRows": {
+            "type": "number",
+            "description": "Строк, готовых к импорту"
+          },
+          "duplicateRows": {
+            "type": "number",
+            "description": "Строк, пропущенных как вероятные дубли"
+          },
+          "invalidRows": {
+            "type": "number",
+            "description": "Строк, пропущенных по ошибкам валидации"
+          },
+          "rows": {
+            "description": "Результат по каждой строке",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowResultDto"
+            }
+          },
+          "unmappedCategories": {
+            "description": "Уникальные исходные значения категории без сопоставления в categoryMap — для шага category mapping мастера",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingRateCurrencies": {
+            "description": "Валюты, для которых в файле или в rates не хватает курса к основной валюте",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imported": {
+            "type": "number",
+            "description": "Фактически импортировано операций"
+          }
+        },
+        "required": [
+          "totalRows",
+          "importableRows",
+          "duplicateRows",
+          "invalidRows",
+          "rows",
+          "unmappedCategories",
+          "missingRateCurrencies",
+          "imported"
         ]
       }
     }

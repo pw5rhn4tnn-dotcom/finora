@@ -98,44 +98,59 @@ export const categoryQuery = z.strictObject({
   ...paginationShape,
   state: z.enum(['all', 'active', 'archived']).default('all'),
 });
+// Общий набор фильтров списка и экспорта: экспорт использует тот же
+// построитель, что список, но без пагинации (ARCHITECTURE §10, §15).
+export const transactionFilterShape = {
+  search: z.string().trim().max(200).optional(),
+  type: z.enum(['ALL', ...transactionTypes]).default('ALL'),
+  categoryId: idSchema.optional(),
+  dateFrom: businessDate.optional(),
+  dateTo: businessDate.optional(),
+  amountMin: money.optional(),
+  amountMax: money.optional(),
+  currency: currency.optional(),
+  sort: z
+    .enum(['newest', 'oldest', 'amountDesc', 'amountAsc'])
+    .default('newest'),
+};
+function checkTransactionFilterRange(
+  v: {
+    dateFrom?: string;
+    dateTo?: string;
+    amountMin?: string;
+    amountMax?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (v.dateFrom && v.dateTo && v.dateFrom > v.dateTo)
+    ctx.addIssue({
+      code: 'custom',
+      path: ['dateTo'],
+      message: 'Конец периода раньше начала',
+    });
+  if (
+    v.amountMin &&
+    v.amountMax &&
+    new RegExp(decimalPattern).test(v.amountMin) &&
+    new RegExp(decimalPattern).test(v.amountMax) &&
+    new Prisma.Decimal(v.amountMin).gt(v.amountMax)
+  )
+    ctx.addIssue({
+      code: 'custom',
+      path: ['amountMax'],
+      message: 'Максимум меньше минимума',
+    });
+}
 export const transactionQuery = z
-  .strictObject({
-    ...paginationShape,
-    search: z.string().trim().max(200).optional(),
-    type: z.enum(['ALL', ...transactionTypes]).default('ALL'),
-    categoryId: idSchema.optional(),
-    dateFrom: businessDate.optional(),
-    dateTo: businessDate.optional(),
-    amountMin: money.optional(),
-    amountMax: money.optional(),
-    currency: currency.optional(),
-    sort: z
-      .enum(['newest', 'oldest', 'amountDesc', 'amountAsc'])
-      .default('newest'),
-  })
-  .superRefine((v, ctx) => {
-    if (v.dateFrom && v.dateTo && v.dateFrom > v.dateTo)
-      ctx.addIssue({
-        code: 'custom',
-        path: ['dateTo'],
-        message: 'Конец периода раньше начала',
-      });
-    if (
-      v.amountMin &&
-      v.amountMax &&
-      new RegExp(decimalPattern).test(v.amountMin) &&
-      new RegExp(decimalPattern).test(v.amountMax) &&
-      new Prisma.Decimal(v.amountMin).gt(v.amountMax)
-    )
-      ctx.addIssue({
-        code: 'custom',
-        path: ['amountMax'],
-        message: 'Максимум меньше минимума',
-      });
-  });
+  .strictObject({ ...paginationShape, ...transactionFilterShape })
+  .superRefine(checkTransactionFilterRange);
+export const transactionExportQuery = z
+  .strictObject({ ...transactionFilterShape })
+  .superRefine(checkTransactionFilterRange);
 export type TransactionInput = z.infer<typeof transactionSchema>;
 export type TransactionPatch = z.infer<typeof transactionPatch>;
 export type TransactionQuery = z.infer<typeof transactionQuery>;
+export type TransactionExportQuery = z.infer<typeof transactionExportQuery>;
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type CategoryQuery = z.infer<typeof categoryQuery>;
 export function invalid(field: string, message: string): never {

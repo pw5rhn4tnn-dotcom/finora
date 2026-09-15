@@ -125,14 +125,14 @@ test('выбор раздела из Ещё закрывает панель, п�
   expect(document.activeElement).toBe(screen.getByRole('main'));
 });
 
-test('deep link CSV сохраняет активность Транзакций и остаётся placeholder', () => {
+test('deep link CSV сохраняет активность Транзакций и показывает мастер импорта', () => {
   mount('/transactions/import');
   expect(screen.getByRole('heading', { name: 'Импорт CSV' })).toBeDefined();
   const link = within(
     screen.getByRole('navigation', { name: 'Основная навигация' }),
   ).getByRole('link', { name: 'Транзакции' });
   expect(link.getAttribute('aria-current')).toBe('page');
-  expect(screen.queryByLabelText(/файл/i)).toBeNull();
+  expect(screen.getByLabelText('CSV-файл')).toBeDefined();
 });
 
 test('неизвестный route показывает понятную 404 и работающую ссылку назад', async () => {

@@ -866,6 +866,79 @@ export interface DashboardDto {
   upcomingRecurring: DashboardUpcomingRecurringDto[];
 }
 
+export interface ImportPreviewDto {
+  /** Заголовки столбцов файла в исходном порядке */
+  columns: string[];
+  /** Первые строки данных файла для предпросмотра маппинга */
+  sampleRows: string[][];
+  /** Всего строк данных в файле (без заголовка) */
+  totalRows: number;
+}
+
+export interface ImportRowErrorDto {
+  /** Поле цели маппинга, к которому относится ошибка */
+  field: string;
+  /** Читаемое описание ошибки */
+  message: string;
+}
+
+/**
+ * valid — будет импортирована; invalid — пропущена по ошибке; duplicate — пропущена как вероятный дубль
+ */
+export type ImportRowResultDtoStatus = typeof ImportRowResultDtoStatus[keyof typeof ImportRowResultDtoStatus];
+
+
+export const ImportRowResultDtoStatus = {
+  valid: 'valid',
+  invalid: 'invalid',
+  duplicate: 'duplicate',
+} as const;
+
+export interface ImportRowResultDto {
+  /** Номер строки данных файла, начиная с 1 */
+  row: number;
+  /** valid — будет импортирована; invalid — пропущена по ошибке; duplicate — пропущена как вероятный дубль */
+  status: ImportRowResultDtoStatus;
+  /** Ошибки строки */
+  errors: ImportRowErrorDto[];
+}
+
+export interface ImportAnalysisDto {
+  /** Всего строк данных в файле */
+  totalRows: number;
+  /** Строк, готовых к импорту */
+  importableRows: number;
+  /** Строк, пропущенных как вероятные дубли */
+  duplicateRows: number;
+  /** Строк, пропущенных по ошибкам валидации */
+  invalidRows: number;
+  /** Результат по каждой строке */
+  rows: ImportRowResultDto[];
+  /** Уникальные исходные значения категории без сопоставления в categoryMap — для шага category mapping мастера */
+  unmappedCategories: string[];
+  /** Валюты, для которых в файле или в rates не хватает курса к основной валюте */
+  missingRateCurrencies: string[];
+}
+
+export interface ImportResultDto {
+  /** Всего строк данных в файле */
+  totalRows: number;
+  /** Строк, готовых к импорту */
+  importableRows: number;
+  /** Строк, пропущенных как вероятные дубли */
+  duplicateRows: number;
+  /** Строк, пропущенных по ошибкам валидации */
+  invalidRows: number;
+  /** Результат по каждой строке */
+  rows: ImportRowResultDto[];
+  /** Уникальные исходные значения категории без сопоставления в categoryMap — для шага category mapping мастера */
+  unmappedCategories: string[];
+  /** Валюты, для которых в файле или в rates не хватает курса к основной валюте */
+  missingRateCurrencies: string[];
+  /** Фактически импортировано операций */
+  imported: number;
+}
+
 export type CategoriesListParams = {
 /**
  * Номер страницы от 1
@@ -981,6 +1054,67 @@ export const TransactionsListSort = {
   amountAsc: 'amountAsc',
 } as const;
 
+export type TransactionsExportParams = {
+/**
+ * Буквальный поиск без регистра по описанию и категории; пробелы по краям удаляются
+ * @maxLength 200
+ */
+search?: string;
+/**
+ * Тип операции
+ */
+type?: TransactionsExportType;
+/**
+ * Категория, включая архивную
+ */
+categoryId?: string;
+/**
+ * Начальная дата включительно
+ */
+dateFrom?: string;
+/**
+ * Конечная дата включительно
+ */
+dateTo?: string;
+/**
+ * Минимум в основной валюте
+ * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+ */
+amountMin?: string;
+/**
+ * Максимум в основной валюте
+ * @pattern ^(0|[1-9][0-9]{0,15})(\.[0-9]{1,8})?$
+ */
+amountMax?: string;
+/**
+ * Исходная валюта из /settings/options
+ */
+currency?: string;
+/**
+ * Порядок; суммы в основной валюте, стабильный дополнительный порядок по id
+ */
+sort?: TransactionsExportSort;
+};
+
+export type TransactionsExportType = typeof TransactionsExportType[keyof typeof TransactionsExportType];
+
+
+export const TransactionsExportType = {
+  ALL: 'ALL',
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+} as const;
+
+export type TransactionsExportSort = typeof TransactionsExportSort[keyof typeof TransactionsExportSort];
+
+
+export const TransactionsExportSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  amountDesc: 'amountDesc',
+  amountAsc: 'amountAsc',
+} as const;
+
 export type BudgetsListParams = {
 /**
  * Номер страницы от 1
@@ -1063,6 +1197,37 @@ year: number;
  * @maximum 12
  */
 month: number;
+};
+
+export type ImportsPreviewBody = {
+  /** CSV-файл, UTF-8, до 5 МБ */
+  file: Blob | File;
+};
+
+export type ImportsValidateBody = {
+  /** CSV-файл, UTF-8, до 5 МБ */
+  file: Blob | File;
+  /** JSON: соответствие целей (transactionDate/type/amount/currency/exchangeRate?/category/description) заголовкам столбцов файла */
+  mapping: string;
+  /** JSON: соответствие исходных значений категории собственным categoryId */
+  categoryMap?: string;
+  /** JSON: курс к основной валюте по коду валюты для строк без курса в файле */
+  rates?: string;
+  /** "true" разрешает импорт строк, отмеченных как вероятные дубли */
+  includeDuplicates?: string;
+};
+
+export type ImportsCreateBody = {
+  /** CSV-файл, UTF-8, до 5 МБ */
+  file: Blob | File;
+  /** JSON: соответствие целей (transactionDate/type/amount/currency/exchangeRate?/category/description) заголовкам столбцов файла */
+  mapping: string;
+  /** JSON: соответствие исходных значений категории собственным categoryId */
+  categoryMap?: string;
+  /** JSON: курс к основной валюте по коду валюты для строк без курса в файле */
+  rates?: string;
+  /** "true" разрешает импорт строк, отмеченных как вероятные дубли */
+  includeDuplicates?: string;
 };
 
 export type healthLiveResponse200 = {
@@ -2532,6 +2697,98 @@ const res = await fetch(getTransactionsCreateUrl(),
 
 
 
+export type transactionsExportResponse200 = {
+  data: void
+  status: 200
+}
+
+export type transactionsExportResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type transactionsExportResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type transactionsExportResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type transactionsExportResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type transactionsExportResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type transactionsExportResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type transactionsExportResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type transactionsExportResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type transactionsExportResponseSuccess = (transactionsExportResponse200) & {
+  headers: Headers;
+};
+export type transactionsExportResponseError = (transactionsExportResponse400 | transactionsExportResponse401 | transactionsExportResponse403 | transactionsExportResponse404 | transactionsExportResponse409 | transactionsExportResponse413 | transactionsExportResponse429 | transactionsExportResponse500) & {
+  headers: Headers;
+};
+
+export type transactionsExportResponse = (transactionsExportResponseSuccess | transactionsExportResponseError)
+
+export const getTransactionsExportUrl = (params?: TransactionsExportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/transactions/export?${stringifiedParams}` : `/api/v1/transactions/export`
+}
+
+/**
+ * @summary Экспортировать в CSV все записи по текущим фильтрам без ограничения страницы
+ */
+export const transactionsExport = async (params?: TransactionsExportParams, options?: RequestInit): Promise<transactionsExportResponse> => {
+
+  const res = await fetch(getTransactionsExportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: transactionsExportResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as transactionsExportResponse
+}
+
+
+
 export type transactionsGetResponse200 = {
   data: TransactionDto
   status: 200
@@ -3813,4 +4070,285 @@ export const dashboardGet = async (params: DashboardGetParams, options?: Request
 
   const data: dashboardGetResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as dashboardGetResponse
+}
+
+
+
+export type importsPreviewResponse200 = {
+  data: ImportPreviewDto
+  status: 200
+}
+
+export type importsPreviewResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type importsPreviewResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type importsPreviewResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type importsPreviewResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type importsPreviewResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type importsPreviewResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type importsPreviewResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type importsPreviewResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type importsPreviewResponseSuccess = (importsPreviewResponse200) & {
+  headers: Headers;
+};
+export type importsPreviewResponseError = (importsPreviewResponse400 | importsPreviewResponse401 | importsPreviewResponse403 | importsPreviewResponse404 | importsPreviewResponse409 | importsPreviewResponse413 | importsPreviewResponse429 | importsPreviewResponse500) & {
+  headers: Headers;
+};
+
+export type importsPreviewResponse = (importsPreviewResponseSuccess | importsPreviewResponseError)
+
+export const getImportsPreviewUrl = () => {
+
+
+
+
+  return `/api/v1/imports/preview`
+}
+
+/**
+ * @summary Разобрать файл и вернуть столбцы/пример строк без валидации
+ */
+export const importsPreview = async (importsPreviewBody: ImportsPreviewBody, options?: RequestInit): Promise<importsPreviewResponse> => {
+    const formData = new FormData();
+formData.append(`file`, importsPreviewBody.file);
+
+  const res = await fetch(getImportsPreviewUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: importsPreviewResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as importsPreviewResponse
+}
+
+
+
+export type importsValidateResponse200 = {
+  data: ImportAnalysisDto
+  status: 200
+}
+
+export type importsValidateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type importsValidateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type importsValidateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type importsValidateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type importsValidateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type importsValidateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type importsValidateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type importsValidateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type importsValidateResponseSuccess = (importsValidateResponse200) & {
+  headers: Headers;
+};
+export type importsValidateResponseError = (importsValidateResponse400 | importsValidateResponse401 | importsValidateResponse403 | importsValidateResponse404 | importsValidateResponse409 | importsValidateResponse413 | importsValidateResponse429 | importsValidateResponse500) & {
+  headers: Headers;
+};
+
+export type importsValidateResponse = (importsValidateResponseSuccess | importsValidateResponseError)
+
+export const getImportsValidateUrl = () => {
+
+
+
+
+  return `/api/v1/imports/validate`
+}
+
+/**
+ * @summary Проверить файл с маппингом без записи в БД: построчная validation и duplicate analysis
+ */
+export const importsValidate = async (importsValidateBody: ImportsValidateBody, options?: RequestInit): Promise<importsValidateResponse> => {
+    const formData = new FormData();
+formData.append(`file`, importsValidateBody.file);
+formData.append(`mapping`, importsValidateBody.mapping);
+if(importsValidateBody.categoryMap !== undefined) {
+ formData.append(`categoryMap`, importsValidateBody.categoryMap);
+ }
+if(importsValidateBody.rates !== undefined) {
+ formData.append(`rates`, importsValidateBody.rates);
+ }
+if(importsValidateBody.includeDuplicates !== undefined) {
+ formData.append(`includeDuplicates`, importsValidateBody.includeDuplicates);
+ }
+
+  const res = await fetch(getImportsValidateUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: importsValidateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as importsValidateResponse
+}
+
+
+
+export type importsCreateResponse201 = {
+  data: ImportResultDto
+  status: 201
+}
+
+export type importsCreateResponse400 = {
+  data: ProblemDto
+  status: 400
+}
+
+export type importsCreateResponse401 = {
+  data: ProblemDto
+  status: 401
+}
+
+export type importsCreateResponse403 = {
+  data: ProblemDto
+  status: 403
+}
+
+export type importsCreateResponse404 = {
+  data: ProblemDto
+  status: 404
+}
+
+export type importsCreateResponse409 = {
+  data: ProblemDto
+  status: 409
+}
+
+export type importsCreateResponse413 = {
+  data: ProblemDto
+  status: 413
+}
+
+export type importsCreateResponse429 = {
+  data: ProblemDto
+  status: 429
+}
+
+export type importsCreateResponse500 = {
+  data: ProblemDto
+  status: 500
+}
+
+export type importsCreateResponseSuccess = (importsCreateResponse201) & {
+  headers: Headers;
+};
+export type importsCreateResponseError = (importsCreateResponse400 | importsCreateResponse401 | importsCreateResponse403 | importsCreateResponse404 | importsCreateResponse409 | importsCreateResponse413 | importsCreateResponse429 | importsCreateResponse500) & {
+  headers: Headers;
+};
+
+export type importsCreateResponse = (importsCreateResponseSuccess | importsCreateResponseError)
+
+export const getImportsCreateUrl = () => {
+
+
+
+
+  return `/api/v1/imports`
+}
+
+/**
+ * @summary Повторить validation по актуальной БД и атомарно импортировать валидные строки с аудитом
+ */
+export const importsCreate = async (importsCreateBody: ImportsCreateBody, options?: RequestInit): Promise<importsCreateResponse> => {
+    const formData = new FormData();
+formData.append(`file`, importsCreateBody.file);
+formData.append(`mapping`, importsCreateBody.mapping);
+if(importsCreateBody.categoryMap !== undefined) {
+ formData.append(`categoryMap`, importsCreateBody.categoryMap);
+ }
+if(importsCreateBody.rates !== undefined) {
+ formData.append(`rates`, importsCreateBody.rates);
+ }
+if(importsCreateBody.includeDuplicates !== undefined) {
+ formData.append(`includeDuplicates`, importsCreateBody.includeDuplicates);
+ }
+
+  const res = await fetch(getImportsCreateUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: importsCreateResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as importsCreateResponse
 }

@@ -7,14 +7,17 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   HttpCode,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBody,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
   ApiNoContentResponse,
 } from '@nestjs/swagger';
@@ -24,12 +27,14 @@ import { CurrentUser } from '../auth/auth.guard.js';
 import { validate } from '../users/preferences.js';
 import {
   idSchema,
+  transactionExportQuery,
   transactionQuery,
   transactionSchema,
   transactionPatch,
 } from '../finance/validation.js';
 import {
   TransactionDto,
+  TransactionExportQueryDto,
   TransactionInputDto,
   TransactionPatchDto,
   TransactionQueryDto,
@@ -52,6 +57,31 @@ export class TransactionsController {
     return this.service.list(user.id, validate(transactionQuery, query));
   }
 
+  @Get('export')
+  @ApiOperation({
+    operationId: 'transactionsExport',
+    summary:
+      'Экспортировать в CSV все записи по текущим фильтрам без ограничения страницы',
+  })
+  @ApiProduces('text/csv')
+  @ApiOkResponse({ description: 'CSV-файл, UTF-8 с BOM, CRLF' })
+  async export(
+    @CurrentUser() user: User,
+    @Query() query: TransactionExportQueryDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const csv = await this.service.export(
+      user.id,
+      validate(transactionExportQuery, query),
+    );
+    const filename = `finora-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+    return csv;
+  }
   @Get(':id')
   @ApiOperation({
     operationId: 'transactionsGet',

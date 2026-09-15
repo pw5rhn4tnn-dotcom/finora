@@ -1,7 +1,7 @@
 import { Prisma } from '../../generated/prisma/client.js';
 import { currencyDigits, invalid } from './validation.js';
 // 24×24 значащих разряда произведения должны сохраниться до единственного округления.
-const Decimal = Prisma.Decimal.clone({ precision: 60 });
+export const Decimal = Prisma.Decimal.clone({ precision: 60 });
 export function financialSnapshot(
   amount: string,
   currency: string,

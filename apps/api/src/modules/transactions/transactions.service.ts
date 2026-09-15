@@ -4,6 +4,7 @@ import { AuditWriter } from '../audit/audit.module.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import {
   invalid,
+  type TransactionExportQuery,
   type TransactionInput,
   type TransactionPatch,
   type TransactionQuery,
@@ -14,6 +15,68 @@ import {
   transactionSnapshot,
 } from '../finance/serialization.js';
 import { financialSnapshot } from '../finance/money.js';
+import { serializeCsv } from '../imports/csv.js';
+
+// Общий batch size постраничного (keyset) чтения экспорта: держит память и
+// длительность каждого отдельного запроса ограниченными независимо от
+// суммарного числа подходящих под фильтр записей (ARCHITECTURE §15/§17,
+// §25 — пачки без загрузки всей истории разом).
+const EXPORT_BATCH_SIZE = 2000;
+
+function buildFilter(q: TransactionQuery | TransactionExportQuery) {
+  // Экранируем LIKE metacharacters: поиск буквальный, параметризованный Prisma.
+  const search = q.search?.replace(/[\\%_]/g, '\\$&');
+  const where: Prisma.TransactionWhereInput = {
+    ...(q.type !== 'ALL' ? { type: q.type } : {}),
+    ...(q.categoryId ? { categoryId: q.categoryId } : {}),
+    ...(q.currency ? { currency: q.currency } : {}),
+    ...(q.dateFrom || q.dateTo
+      ? {
+          transactionDate: {
+            ...(q.dateFrom ? { gte: new Date(q.dateFrom) } : {}),
+            ...(q.dateTo ? { lte: new Date(q.dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(q.amountMin || q.amountMax
+      ? {
+          amountInBaseCurrency: {
+            ...(q.amountMin ? { gte: q.amountMin } : {}),
+            ...(q.amountMax ? { lte: q.amountMax } : {}),
+          },
+        }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { description: { contains: search, mode: 'insensitive' } },
+            { category: { name: { contains: search, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+  };
+  const orderBy: Prisma.TransactionOrderByWithRelationInput[] =
+    q.sort === 'newest'
+      ? [{ transactionDate: 'desc' }, { id: 'desc' }]
+      : q.sort === 'oldest'
+        ? [{ transactionDate: 'asc' }, { id: 'asc' }]
+        : [
+            { amountInBaseCurrency: q.sort === 'amountAsc' ? 'asc' : 'desc' },
+            { id: 'asc' },
+          ];
+  return { where, orderBy };
+}
+const EXPORT_HEADERS = [
+  'transactionDate',
+  'type',
+  'amount',
+  'currency',
+  'exchangeRate',
+  'amountInBaseCurrency',
+  'category',
+  'description',
+  'source',
+];
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -36,47 +99,8 @@ export class TransactionsService {
     return transactionView(await this.owned(this.prisma.client, userId, id));
   }
   async list(userId: string, q: TransactionQuery) {
-    // Экранируем LIKE metacharacters: поиск буквальный, параметризованный Prisma.
-    const search = q.search?.replace(/[\\%_]/g, '\\$&');
-    const where: Prisma.TransactionWhereInput = {
-      userId,
-      ...(q.type !== 'ALL' ? { type: q.type } : {}),
-      ...(q.categoryId ? { categoryId: q.categoryId } : {}),
-      ...(q.currency ? { currency: q.currency } : {}),
-      ...(q.dateFrom || q.dateTo
-        ? {
-            transactionDate: {
-              ...(q.dateFrom ? { gte: new Date(q.dateFrom) } : {}),
-              ...(q.dateTo ? { lte: new Date(q.dateTo) } : {}),
-            },
-          }
-        : {}),
-      ...(q.amountMin || q.amountMax
-        ? {
-            amountInBaseCurrency: {
-              ...(q.amountMin ? { gte: q.amountMin } : {}),
-              ...(q.amountMax ? { lte: q.amountMax } : {}),
-            },
-          }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              { description: { contains: search, mode: 'insensitive' } },
-              { category: { name: { contains: search, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
-    };
-    const orderBy: Prisma.TransactionOrderByWithRelationInput[] =
-      q.sort === 'newest'
-        ? [{ transactionDate: 'desc' }, { id: 'desc' }]
-        : q.sort === 'oldest'
-          ? [{ transactionDate: 'asc' }, { id: 'asc' }]
-          : [
-              { amountInBaseCurrency: q.sort === 'amountAsc' ? 'asc' : 'desc' },
-              { id: 'asc' },
-            ];
+    const { where: filter, orderBy } = buildFilter(q);
+    const where: Prisma.TransactionWhereInput = { userId, ...filter };
     return this.prisma.client.$transaction(
       async (db) => ({
         items: (
@@ -94,6 +118,49 @@ export class TransactionsService {
       }),
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+  // Тот же построитель фильтров/сортировки и ownership, что список, но без
+  // ограничения текущей страницы; читает совпадающие записи пачками через
+  // keyset-курсор по стабильному tie-breaker id того же orderBy (ARCHITECTURE
+  // §10, §15, §17). CSV-строки не доверяют ничего, кроме уже сохранённых
+  // серверных полей: id/ownerId/createdAt/source не экспортируются как
+  // редактируемые данные, category — человекочитаемым именем, не UUID.
+  async export(userId: string, q: TransactionExportQuery): Promise<string> {
+    const { where: filter, orderBy } = buildFilter(q);
+    const where: Prisma.TransactionWhereInput = { userId, ...filter };
+    const rows: string[][] = [];
+    await this.prisma.client.$transaction(
+      async (db) => {
+        let cursor: string | undefined;
+        for (;;) {
+          const batch = await db.transaction.findMany({
+            where,
+            orderBy,
+            take: EXPORT_BATCH_SIZE,
+            include: { category: true },
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          });
+          for (const row of batch) {
+            const view = transactionView(row);
+            rows.push([
+              view.transactionDate,
+              view.type,
+              view.amount,
+              view.currency,
+              view.exchangeRate,
+              view.amountInBaseCurrency,
+              view.category.name,
+              view.description,
+              view.source,
+            ]);
+          }
+          if (batch.length < EXPORT_BATCH_SIZE) break;
+          cursor = batch[batch.length - 1]!.id;
+        }
+      },
+      { isolationLevel: 'RepeatableRead', timeout: 30_000, maxWait: 10_000 },
+    );
+    return serializeCsv(EXPORT_HEADERS, rows);
   }
   private async category(
     db: Prisma.TransactionClient,

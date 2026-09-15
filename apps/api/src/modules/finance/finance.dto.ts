@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 import {
   categoryIcons,
   decimalPattern,
@@ -208,3 +213,7 @@ export class TransactionQueryDto extends PaginationQueryDto {
   })
   sort?: 'newest' | 'oldest' | 'amountDesc' | 'amountAsc';
 }
+export class TransactionExportQueryDto extends OmitType(TransactionQueryDto, [
+  'page',
+  'pageSize',
+] as const) {}
