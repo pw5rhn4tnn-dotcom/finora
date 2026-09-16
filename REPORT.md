@@ -3689,14 +3689,14 @@ feature-изменений.
 
 - `lock_timeout`/`statement_timeout` — параметры startup-пакета PostgreSQL
   (session GUC): `pg` шлёт их через `ConnectionParameters` (`lib/connection-
-  parameters.js:121-123`) и сериализует в сам startup-пакет (`lib/client.js:558-
-  565`, поле `data.statement_timeout`/`data.lock_timeout` рядом с `user`/
+parameters.js:121-123`) и сериализует в сам startup-пакет (`lib/client.js:558-
+565`, поле `data.statement_timeout`/`data.lock_timeout` рядом с `user`/
   `database`). Это значит: они действуют на стороне САМОГО Postgres и приводят
   к настоящей ошибке backend'а (`55P03 lock_not_available` / `57014
-  query_canceled`) с последующим полноценным `ReadyForQuery` — независимо от
+query_canceled`) с последующим полноценным `ReadyForQuery` — независимо от
   того, ждёт ли клиент ответ или уже перестал.
 - `query_timeout` — чисто клиентский `setTimeout` в Node (`lib/client.js:702-
-  731`, метод `Client.query`). При срабатывании он (а) отклоняет промис/callback
+731`, метод `Client.query`). При срабатывании он (а) отклоняет промис/callback
   локально, (б) если запрос уже ушёл на wire и клиент НЕ в pipeline-режиме —
   просто выходит (`else if (this.pipeline) { ...destroy...; return }`, то есть
   ветка `destroy()` — ТОЛЬКО для pipeline; в обычном режиме соединение не
@@ -3757,6 +3757,7 @@ per-statement лимит Postgres, применяющийся к КАЖДОМУ 
 использует `lockOwner()`/`FOR UPDATE`.
 
 **5. Fix изменён.** `apps/api/src/prisma/client.ts`:
+
 - `query_timeout` — убран (не переупорядочен вверх с произвольным числом):
   при любом значении ниже серверных таймаутов повторяет п.2/3, при значении
   выше — избыточен, так как серверные таймауты уже разрешат промис раньше
@@ -3785,6 +3786,7 @@ per-statement лимит Postgres, применяющийся к КАЖДОМУ 
 `PrismaClient`/`PrismaPg` с малыми `lock_timeout: 300`/`statement_timeout: 500`
 против реальной PostgreSQL (`databaseFixture()`, тот же fixture, что и
 остальные `apps/api/test/*.test.ts`):
+
 - lock wait: одна транзакция держит `SELECT ... FOR UPDATE` открытой,
   вторая — на том же пуле — получает `lock timeout` через ~300 мс; сразу
   после этого следующий обычный запрос через тот же пул проходит
@@ -3800,14 +3802,14 @@ test` — 140/140, было 137/137: +1 test + 2 вложенных `t.test`).
 
 **7. Gates после изменения (эта сессия).**
 
-| Gate                                                                                                   | Результат                                    |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `pnpm typecheck` (3 workspace)                                                                          | PASS                                          |
-| `pnpm lint`                                                                                              | PASS (0 warnings)                             |
-| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                  | PASS — 140/140 (было 137/137)                 |
-| Targeted: `csv-import.compose.spec.ts --project=chromium --no-deps --workers=2 --retries=0`, полный `restart api` + wait-for-healthy перед каждым прогоном, локально пересобранный (`--build`) образ api с исправлением | PASS — 20/20 подряд, 0 timeout/flake |
-| `pnpm test:e2e:stage9-stress` (тот же disposable stack, `workers=1/2/4` по ротации, 20 прогонов)          | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0» |
-| `pnpm test:docker` (clean-runner: чистая копия исходников, свой disposable Compose, полный acceptance + outage/recovery + cleanup) | PASS — весь список acceptance (Stage 5/6/8/9/10 Compose, DB outage/recovery, dataset SHA-256), «Acceptance environment остановлен, его volume удалён» |
+| Gate                                                                                                                                                                                                                    | Результат                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck` (3 workspace)                                                                                                                                                                                          | PASS                                                                                                                                                  |
+| `pnpm lint`                                                                                                                                                                                                             | PASS (0 warnings)                                                                                                                                     |
+| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                                                                                                                                  | PASS — 140/140 (было 137/137)                                                                                                                         |
+| Targeted: `csv-import.compose.spec.ts --project=chromium --no-deps --workers=2 --retries=0`, полный `restart api` + wait-for-healthy перед каждым прогоном, локально пересобранный (`--build`) образ api с исправлением | PASS — 20/20 подряд, 0 timeout/flake                                                                                                                  |
+| `pnpm test:e2e:stage9-stress` (тот же disposable stack, `workers=1/2/4` по ротации, 20 прогонов)                                                                                                                        | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0»                                                                       |
+| `pnpm test:docker` (clean-runner: чистая копия исходников, свой disposable Compose, полный acceptance + outage/recovery + cleanup)                                                                                      | PASS — весь список acceptance (Stage 5/6/8/9/10 Compose, DB outage/recovery, dataset SHA-256), «Acceptance environment остановлен, его volume удалён» |
 
 Не запускались повторно (не требовались этим заданием и не менялись):
 `format:check`, `build`, `db:validate`, `api:check`, `pnpm --filter @finora/web
@@ -3825,8 +3827,7 @@ Playwright timeout не увеличивался, retries/sleeps в тестов
 commit: `statement_timeout` (35000) выше `export()`-таймаута интерактивной
 транзакции Prisma (`{ timeout: 30_000 }`,
 `transactions.service.ts:161`) — но сама интерактивная транзакция Prisma
-имеет СОБСТВЕННЫЙ client-side таймер на 30000, который срабатывает раньше
-35000. Нужно доказать по исходникам установленной `prisma@7.10.0` (не по
+имеет СОБСТВЕННЫЙ client-side таймер на 30000, который срабатывает раньше 35000. Нужно доказать по исходникам установленной `prisma@7.10.0` (не по
 документации), что происходит с реально выполняющимся на backend SQL
 statement, когда этот таймер истекает, и безопасен ли ordering 30000/35000
 именно для этого механизма — отдельно от уже доказанного в предыдущей сессии
@@ -3853,7 +3854,7 @@ statement, когда этот таймер истекает, и безопас�
   отправляет и **awaits** `ROLLBACK` (`t.transaction.executeRaw(i)`, `i="ROLLBACK"`)
   и только в `finally` вызывает `t.transaction.rollback()` — driver-adapter
   метод, который (см. предыдущую сессию, `@prisma/adapter-pg@7.10.0/dist/
-  index.js:712-720`) зовёт `client.release()` пула. То есть release происходит
+index.js:712-720`) зовёт `client.release()` пула. То есть release происходит
   строго после настоящего `ReadyForQuery` на `ROLLBACK`, а сам `ROLLBACK`
   отправляется строго после того, как предыдущая операция (в т.ч. всё ещё
   выполняющийся на backend statement) реально освободила мьютекс.
@@ -3946,18 +3947,19 @@ PostgreSQL-запроса экспорта. Прямое подтвержден�
 в 273–507мс на прогон — единственный отдельный SQL batch экспорта в нём
 занимает миллисекунды, не секунды. 29.1с не является и не может напрямую
 свидетельствовать о том, что отдельному export-batch может потребоваться
->20–25с — это была метрика другого измерения (весь e2e flow под внешней
-нагрузкой), не per-statement время.
+
+> 20–25с — это была метрика другого измерения (весь e2e flow под внешней
+> нагрузкой), не per-statement время.
 
 **7. Gates (эта сессия).**
 
-| Gate                                                                                                   | Результат                                    |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `pnpm lint`                                                                                             | PASS (0 warnings)                             |
-| `pnpm typecheck` (3 workspace)                                                                          | PASS                                          |
-| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                  | PASS — 141/141 (было 140/140, +1 новый тест)  |
-| Новый тест `db-timeout-policy.test.ts` изолированно, 20 повторов подряд                                 | PASS — 20/20, 0 flake                         |
-| `pnpm test:e2e:auth` (чистый checkout, пересобранный Docker, полный browser CRUD + встроенный Stage 9 stress) | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0», `экспорт CSV` 273–507мс/прогон |
+| Gate                                                                                                                               | Результат                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm lint`                                                                                                                        | PASS (0 warnings)                                                                                                                                                  |
+| `pnpm typecheck` (3 workspace)                                                                                                     | PASS                                                                                                                                                               |
+| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                                             | PASS — 141/141 (было 140/140, +1 новый тест)                                                                                                                       |
+| Новый тест `db-timeout-policy.test.ts` изолированно, 20 повторов подряд                                                            | PASS — 20/20, 0 flake                                                                                                                                              |
+| `pnpm test:e2e:auth` (чистый checkout, пересобранный Docker, полный browser CRUD + встроенный Stage 9 stress)                      | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0», `экспорт CSV` 273–507мс/прогон                                                    |
 | `pnpm test:docker` (clean-runner: чистая копия исходников, свой disposable Compose, полный acceptance + outage/recovery + cleanup) | PASS — Stage 5/6/8/9/10 Compose, DB outage/recovery, dataset SHA-256 `55c7d9a5...` (совпадает с эталонным), «Acceptance environment остановлен, его volume удалён» |
 
 `apps/api/src/prisma/client.ts` в этой сессии НЕ менялся (35000 подтверждён,
