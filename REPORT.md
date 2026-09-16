@@ -3494,24 +3494,503 @@ SHA-256 с Stage 11; скрытой зависимости от локальны
 
 ### Оставшиеся риски
 
-Нет блокирующих. Некритично: production frontend bundle (`index-*.js`,
-569.93 kB / gzip 169.72 kB) превышает предупредительный порог Vite
-(500 kB) — тот же bundle, что и на Stage 11, не регрессия Stage 12;
+Локально блокирующих нет. Некритично: production frontend bundle
+(`index-*.js`, 569.93 kB / gzip 169.72 kB) превышает предупредительный порог
+Vite (500 kB) — тот же bundle, что и на Stage 11, не регрессия Stage 12;
 code-splitting не входит в обязательный Definition of Done ни одного Stage
 и не блокирует demo/deployment. Видео-демонстрация не записывалось —
-ROADMAP явно называет её необязательным дополнением.
+ROADMAP явно называет её необязательным дополнением. Отдельный
+блокирующий риск для remote-гейта — см. ниже.
+
+### Commit пользователем и remote CI: FAILED (флейк, не регрессия Stage 12)
+
+Пользователь закоммитил и запушил правки этой сессии самостоятельно —
+`e229dff` («docs: завершить подготовку Finora к развертыванию и
+демонстрации»), `git status --short` после этого — чисто, `main` synced с
+`origin/main`. Это первый Stage 12 commit; проверка `gh run list`
+показала: run `35018679859` для `e229dff` — **FAILED**
+(`2026-09-15T20:17:23Z`, job «Foundation и PostgreSQL», ubuntu-latest).
+
+**Диагноз.** Второй job (`Чистый и повторный Docker startup`) — зелёный.
+Первый job упал на шаге «Проверить auth и финансовый CRUD через Nginx и
+PostgreSQL в браузере», внутри `scripts/check-stage9-e2e.mjs`, на
+**stress-итерации 2/20 (`workers=2`)** — все предыдущие обязательные шаги
+этого же job (lint/format/typecheck/tests/build/OpenAPI-воспроизводимость/
+responsive-accessibility smoke) прошли. Упавший тест — тот же самый, что и
+в Stage 10 repair (`Stage 9: повторный импорт того же файла — вероятные
+дубли по умолчанию пропускаются`), с идентичным симптомом:
+`apiRequestContext.get: Test timeout of 30000ms exceeded`.
+
+Это **не регрессия Stage 12**: изменения этой сессии — только Markdown
+(`README.md`/`ARCHITECTURE.md`/`ROADMAP.md`/`REPORT.md`), тест и
+приложение не менялись. Структурное исправление Stage 10 repair (per-worker
+изолированный `csvOwner`-аккаунт вместо общего `sessions.personal`)
+подтверждено на месте в `apps/web/e2e/csv-import.compose.spec.ts:37-69` —
+переопределение `sessions.personal → csvOwner` в этом файле сохранено, race
+за одну и ту же строку `users` между тестами этого файла закрыта. Оба
+внутренних таймаута Prisma/`pg` (`connectionTimeoutMillis`/`query_timeout`,
+`apps/api/src/prisma/client.ts:7-8`) — 3000 мс, то есть отдельная попытка
+подключения/запроса при исчерпании pool (`max: 10`) должна завершаться
+ошибкой быстро, не тихим 30-секундным зависанием — это говорит не в пользу
+одной лишь конкуренции за pool-соединения как полной причины именно
+30-секундного таймаута. Локальный полный прогон этой сессии (`pnpm
+test:e2e:auth`, включая тот же встроенный Stage 9 stress 20/20 с теми же
+итерациями `workers=1/2/4`) прошёл **без единого timeout/flake** — то есть
+дефект не воспроизводится ни на этой машине, ни при искусственном throttling
+(см. Stage 10 repair выше, где тот же тест не воспроизводился локально даже
+под CPU-throttle 0.5 vCPU). GitHub-раннер (`ubuntu-latest`, стандартные
+2 vCPU, shared/non-dedicated) — правдоподобный источник кратковременного
+провала отклика API-процесса (GC pause/event-loop stall/scheduling jitter
+хоста), которого не воспроизвести локально. Классификация не меняется
+относительно Stage 10: **дефект нагрузки remote-раннера/жёсткого 30 с
+Playwright request timeout, не продуктовый дефект и не регрессия Stage 12.**
+
+**Что не было сделано в предыдущей сессии и почему это оказалось
+недостаточным.** Предыдущая сессия остановилась на классификации «известный
+класс remote-раннер flake» без реального root cause и без исправления —
+со ссылкой на то, что Stage 12 ограничивает объём работы. Это было
+пересмотрено следующей сессией (см. ниже): пользователь явно потребовал
+именно root cause и именно исправление этого конкретного remote-регресса,
+а не новый общий аудит и не новый Stage — то есть работа ниже целиком
+внутри уже открытого «блокирующего риска remote-гейта», а не новый scope.
+
+#### Root cause найден и исправлен (следующая сессия)
+
+**Root cause.** `apps/api/src/prisma/client.ts` задавал только клиентский
+`query_timeout: 3000` (таймер `pg` в Node-процессе) и не задавал НИ
+`statement_timeout`, НИ `lock_timeout` на стороне самого PostgreSQL. Разбор
+исходников `pg`/`@prisma/adapter-pg` (`node_modules/.pnpm/pg@8.23.0/lib/client.js:702-731`,
+`node_modules/.pnpm/@prisma+adapter-pg@7.10.0/dist/index.js:705-721`)
+показал: клиентский `query_timeout` при срабатывании лишь отклоняет промис
+на стороне Node — он НЕ отправляет `Cancel Request` и не разрывает
+TCP-соединение для уже отправленного (non-pipelined) запроса. Реальный
+backend-процесс Postgres в этот момент продолжает как ни в чём не бывало
+выполнять/ждать блокировку по этому запросу сколь угодно долго (без
+`lock_timeout`/`statement_timeout` — буквально неограниченно), а
+`adapter-pg` (`PgTransaction.commit()`/`rollback()`) безусловно вызывает
+`client.release()` без ошибки, возвращая такое «занятое» соединение в пул
+как исправное.
+
+Конкретный триггер именно в этом тесте: `POST /api/v1/imports` (commit
+импорта) и `DELETE /api/v1/transactions/:id` (внутри `cleanupBySearch()` в
+`finally`) оба вызывают `lockOwner()`
+(`apps/api/src/modules/finance/locking.ts:4`, `SELECT ... FOR UPDATE` на
+строку `users` того же worker-изолированного `csvOwner`) — то есть,
+последовательно, друг за другом, в рамках ОДНОГО и того же worker, на
+ОДНОЙ и той же строке пользователя. Если backend Postgres под реальной
+CPU/IO-нагрузкой remote-раннера (два параллельных Chromium-процесса + API +
+Postgres на стандартных 2 shared vCPU) не укладывается в 3000 мс на каком-то
+шаге (сам `SELECT ... FOR UPDATE`, либо последующий `COMMIT`/`ROLLBACK`,
+который физически не может уйти на wire раньше ответа на предыдущий запрос
+того же соединения), клиент по `query_timeout` уже «сдаётся» и возвращает
+ошибку/переходит к следующему шагу теста, а Postgres-сессия остаётся
+подвешенной в незавершённой транзакции с удержанной блокировкой строки —
+без внешнего `lock_timeout` она ничем не ограничена. Следующий запрос
+(`GET /api/v1/transactions` в `cleanupBySearch()`), которому pg-pool выдаёт
+то же самое «занятое» соединение, встаёт в очередь позади невидимого
+клиенту запроса (`_pulseQueryQueue()` не диспетчерит новый запрос, пока
+`readyForQuery !== true`) и получает собственный такой же 3-секундный
+клиентский таймаут — цикл может повторяться, пока исходная транзакция жива,
+и суммарно превысить жёсткий 30-секундный таймаут Playwright
+`apiRequestContext`. Это именно «shared mutable state»-дефект (гипотезы 2/4/7
+из технического задания), а не медленный раннер сам по себе: без
+`lock_timeout`/`statement_timeout` абсолютно любая, даже штатная,
+кратковременная просадка отклика backend необратимо «зомбирует» одно
+соединение пула до естественного завершения оригинального запроса.
+
+**Почему не проявилось локально, но поймал GitHub-раннер.** На быстрой
+незагруженной локальной машине (и даже под искусственным CPU-throttle,
+использованным в Stage 10 repair) ни `SELECT ... FOR UPDATE` на
+неконкурентной строке, ни `COMMIT`/`ROLLBACK` практически никогда не
+занимают заметное время — весь сценарий требует, чтобы КОНКРЕТНЫЙ уже
+отправленный на wire запрос реально исполнялся на backend дольше 3000 мс
+именно в момент срабатывания клиентского таймаута, что нельзя достоверно
+воспроизвести искусственным замедлением CPU процесса-клиента (throttle
+Node/Chromium не то же самое, что реальная просадка Postgres backend +
+scheduling jitter хоста под одновременной нагрузкой 2 параллельных
+браузерных воркеров на shared 2-vCPU раннере). Целевой прогон этой сессии
+(см. ниже) зафиксировал прямое подтверждение: тест `экспорт CSV` (не
+использующий `lockOwner`, но конкурирующий за тот же пул соединений) один
+раз занял 29.1 с из 30 с бюджета Playwright на локальной машине, будучи
+случайно вытеснен параллельно запущенными lint/typecheck/build процессами
+той же сессии — то есть даже быстрая машина способна вплотную подойти к
+границе при реальной посторонней нагрузке, подтверждая правдоподобность
+механизма, а не только remote-специфичность стенда.
+
+**Исправление.** `apps/api/src/prisma/client.ts` — добавлены серверные
+параметры PostgreSQL `lock_timeout: 5000` и `statement_timeout: 20000`
+(передаются в `PrismaPg`/`pg.Pool` как startup-параметры сессии,
+подтверждено по `node_modules/.pnpm/pg@8.23.0/lib/connection-parameters.js:121-123`).
+Они гарантированно завершают (с ошибкой на стороне самого Postgres, значит
+с реальным `ReadyForQuery` и освобождением соединения) зависшее ожидание
+блокировки или сам запрос независимо от того, что клиент уже перестал
+ждать — устраняя ровно тот сценарий «неограниченно зомбированного»
+соединения, который описан в root cause. `statement_timeout` (20 000 мс)
+намеренно оставлен с запасом ниже explicit `timeout: 30_000` у `export()`
+(`transactions.service.ts:161`, единственная сознательно долгая
+интерактивная транзакция в кодовой базе), чтобы не сломать легитимный
+батчевый CSV-экспорт большого объёма; `lock_timeout` (5000 мс) — отдельно и
+туже, так как ни для одного легитимного `lockOwner()`-вызова в кодовой базе
+ожидание блокировки чужой транзакцией не является ожидаемым сценарием при
+корректной per-worker/per-user изоляции. Ни таймауты Playwright, ни состав
+теста, ни `workers=2` не менялись — согласно ограничениям задания.
+
+**Регрессионное доказательство (эта сессия, node v24.21.0, локально
+пересобранный `docker compose build` образ api с исправлением).**
+
+Таргетированная конфигурация (именно падавшая): `csv-import.compose.spec.ts
+--project=chromium --no-deps --workers=2 --retries=0`, с полным `restart
+api` + wait-for-healthy перед каждым прогоном (та же процедура, что и в
+`scripts/check-stage9-e2e.mjs`) — **20/20 подряд чистых PASS**, 0
+timeout/flake, retries оставались 0.
+
+Полный `node scripts/check-stage9-e2e.mjs` (родной gate, 20 итераций,
+`workers=1/2/4` по ротации) — **PASS**: «20 последовательных запусков, 80
+test cases … workers=1/2/4, retries=0», 0 failures.
+
+#### Затем полные gates (эта сессия, после исправления)
+
+| Gate                                                                                                                | Результат                           |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `pnpm format:check`                                                                                                 | PASS                                |
+| `pnpm lint`                                                                                                         | PASS (0 warnings)                   |
+| `pnpm typecheck` (3 workspace)                                                                                      | PASS                                |
+| `pnpm build` (api + web)                                                                                            | PASS                                |
+| `pnpm db:validate`                                                                                                  | PASS                                |
+| `pnpm api:check`                                                                                                    | PASS (OpenAPI/Orval воспроизводимы) |
+| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                              | PASS — 137/137                      |
+| `pnpm --filter @finora/web test` (vitest)                                                                           | PASS — 97/97                        |
+| `pnpm test:e2e` (responsive/a11y smoke)                                                                             | PASS — 15/15                        |
+| `pnpm test:e2e:auth` (чистый checkout, пересобранный Docker, полный browser CRUD + встроенный Stage 9 stress 20/20) | PASS                                |
+| `node scripts/test-docker.mjs` (чистый/повторный Docker startup — job «Чистый и повторный Docker startup»)          | PASS                                |
+
+Все перечисленные gates перезапущены заново после изменения кода (не
+предъявляется старый результат Stage 12).
+
+#### Технический аудит ordering timeout'ов и повторное исправление (следующая сессия)
+
+**Задание.** Пользователь потребовал последнюю техническую проверку fix'а
+перед commit: 3000/5000/20000 (`query_timeout`/`lock_timeout`/`statement_timeout`)
+дают ordering, в котором клиентский `query_timeout` срабатывает РАНЬШЕ обоих
+серверных таймаутов, а не после них — то есть заявленный root cause («серверные
+таймауты гарантированно освобождают соединение независимо от клиента») этим
+конкретным ordering'ом не доказан как полное устранение гонки, только как её
+возможное сокращение. Отдельно — усомниться в утверждении «`statement_timeout`
+20000 безопасен, потому что export timeout 30000», без опоры на предположение,
+по факту исходников установленной версии `pg`/`@prisma/adapter-pg`. Аудит и
+изменения строго ограничены этим fix'ом (`apps/api/src/prisma/client.ts`) —
+без общего аудита проекта, без переписывания остального Stage 12, без новых
+feature-изменений.
+
+**1. Фактическая семантика (прочитаны исходники, не предположения).**
+Установленные версии подтверждены напрямую (`node_modules/.pnpm`, не
+`package.json`): `pg@8.23.0`, `@prisma/adapter-pg@7.10.0`, `@prisma/client@7.10.0`,
+`prisma@7.10.0` — совпадают с задекларированными.
+
+- `lock_timeout`/`statement_timeout` — параметры startup-пакета PostgreSQL
+  (session GUC): `pg` шлёт их через `ConnectionParameters` (`lib/connection-
+  parameters.js:121-123`) и сериализует в сам startup-пакет (`lib/client.js:558-
+  565`, поле `data.statement_timeout`/`data.lock_timeout` рядом с `user`/
+  `database`). Это значит: они действуют на стороне САМОГО Postgres и приводят
+  к настоящей ошибке backend'а (`55P03 lock_not_available` / `57014
+  query_canceled`) с последующим полноценным `ReadyForQuery` — независимо от
+  того, ждёт ли клиент ответ или уже перестал.
+- `query_timeout` — чисто клиентский `setTimeout` в Node (`lib/client.js:702-
+  731`, метод `Client.query`). При срабатывании он (а) отклоняет промис/callback
+  локально, (б) если запрос уже ушёл на wire и клиент НЕ в pipeline-режиме —
+  просто выходит (`else if (this.pipeline) { ...destroy...; return }`, то есть
+  ветка `destroy()` — ТОЛЬКО для pipeline; в обычном режиме соединение не
+  рвётся и Cancel Request не отправляется), (в) зовёт `_pulseQueryQueue()`, что
+  диспетчит следующий запрос из `_queryQueue`, если он ещё не был отправлен —
+  но не влияет на реально отправленный `_activeQuery`. Реальный backend
+  продолжает выполнять/ждать блокировку по этому запросу до собственного
+  `lock_timeout`/`statement_timeout` или до штатного завершения.
+
+**2. Предыдущий root cause: подтверждён, с уточнением на один уровень глубже.**
+Уточнение, не найденное в предыдущей формулировке: одного «клиент не
+дожидается ответа» недостаточно для объяснения зомби-соединения — нужен ещё
+факт, что что-то ВСЁ РАВНО зовёт `release()` по таймауту клиента. Прочитаны
+исходники `@prisma/adapter-pg@7.10.0/dist/index.js:712-720`:
+`PgTransaction.commit()`/`rollback()` безусловно зовут `this.client.release()`
+без проверки состояния соединения. Прочитаны исходники `pg-pool@3.14.0`
+(`lib/index.js`, метод `_release(client, idleListener, err)`, строка ~391):
+клиент кладётся в `_idle` («исправен») если НЕТ `err` и НЕТ `this.ending`/
+`client._ending`/`!client._queryable` — `readyForQuery`/`_activeQuery` в этой
+проверке не участвуют вовсе. Итого цепочка подтверждена буквально по коду: (1)
+`query_timeout` отклоняет промис без ошибки для `release()`, (2) Prisma
+ловит ошибку своего таймаута и по обычному catch/finally интерактивной
+транзакции зовёт `rollback()`, (3) `rollback()` зовёт `client.release()` без
+аргумента-ошибки, (4) `pg-pool._release` не проверяет `readyForQuery` и кладёт
+клиента в `_idle`, (5) следующий запрос получает этот pool-slot и в `pg`
+(`Client.query`) встаёт в `_queryQueue` позади ещё не завершённого
+`_activeQuery`, получая свой собственный таймаут по кругу. **Root cause
+верен.**
+
+**3. Ordering 3000/5000/20000 — НЕ корректен**, ровно по опасению
+пользователя, доказано по коду (не предположением). `query_timeout` (3000) —
+строго МЕНЬШЕ обоих серверных таймаутов, а он единственный, кто отклоняет
+промис ДО того, как Postgres в реальности прислал `ReadyForQuery`. Поэтому
+именно `query_timeout`, а не сам факт отсутствия серверных таймаутов, был
+(и остаётся, пока стоит ниже них) механизмом, включающим цепочку из п.2 —
+серверные таймауты только ОГРАНИЧИВАЮТ её длину (максимум 20000 мс вместо
+неограниченного), но не устраняют. Желаемое свойство «server-side cancellation
+раньше client-side abandon» этим ordering'ом не выполняется: `query_timeout`
+абсолютно всегда срабатывает первым для любого запроса дольше 3с, не только
+для реальной гонки за блокировку. Доказательства «текущие 3s/5s/20s уже
+корректны» не существует — существует обратное.
+
+**4. Экспорт — затрагивает, конфликт реален.** `TransactionsService.export()`
+(`apps/api/src/modules/transactions/transactions.service.ts:128-163`) выполняет
+цикл `db.transaction.findMany()` батчами по `EXPORT_BATCH_SIZE=2000`
+(`transactions.service.ts:24`) внутри ОДНОЙ интерактивной транзакции Prisma
+с `{ timeout: 30_000, maxWait: 10_000 }` — то есть 30000 мс — это бюджет НА ВСЮ
+транзакцию (может включать много `findMany`), тогда как `statement_timeout` —
+per-statement лимит Postgres, применяющийся к КАЖДОМУ отдельному batch
+заново. Значение per-statement лимита НИЖЕ per-transaction бюджета (было
+20000 < 30000) внутренне противоречиво: единственный медленный batch (под той
+же нагрузкой раннера, что уже фиксировал сам предыдущий сеанс — CSV export
+однажды занял 29.1с из 30с локально) прерывался бы Postgres'ом ошибкой
+`statement timeout` ЗАДОЛГО до того, как Prisma сама сочла бы транзакцию
+просроченной — то есть прежнее объяснение «20000 оставлен с запасом НИЖЕ
+30000, чтобы не сломать export» было ровно наоборот тому, что нужно для
+безопасности export'а. `lock_timeout` экспорт не затрагивает — `export()` не
+использует `lockOwner()`/`FOR UPDATE`.
+
+**5. Fix изменён.** `apps/api/src/prisma/client.ts`:
+- `query_timeout` — убран (не переупорядочен вверх с произвольным числом):
+  при любом значении ниже серверных таймаутов повторяет п.2/3, при значении
+  выше — избыточен, так как серверные таймауты уже разрешат промис раньше
+  него через настоящий `ReadyForQuery`. Без клиентского таймера `commit()`/
+  `rollback()` вызываются только после реального ответа Postgres (успеха или
+  ошибки `lock_timeout`/`statement_timeout`), то есть `client.release()`
+  всегда кладёт в пул действительно готовое соединение — свойство
+  «server-side cancellation раньше client-side abandon» выполняется
+  тривиально, потому что client-side abandon для запросов не удалён вовсе.
+  `connectionTimeoutMillis: 3000` (ожидание TCP/handshake, а не выполнения
+  запроса) не создаёт эту гонку и оставлен как есть.
+- `lock_timeout: 5000` — оставлен без изменений (корректно ниже
+  `statement_timeout`, ограничивает именно `lockOwner()`).
+- `statement_timeout: 20000 → 35000` — поднят выше per-transaction бюджета
+  `export()` (30000 + запас 5000), устраняя конфликт из п.4, без ослабления
+  защиты `lockOwner()` (там связывающий таймаут — `lock_timeout`, не зависит
+  от величины `statement_timeout`).
+
+Подробное обоснование каждого значения — в комментариях
+`apps/api/src/prisma/client.ts:8-59` (точные номера строк исходников `pg`/
+`@prisma/adapter-pg`/`pg-pool`, на которые ссылается разбор выше).
+
+**6. Регрессионное доказательство.** Добавлен
+`apps/api/test/db-timeout-policy.test.ts` — не повторяет production-числа
+(иначе один прогон занял бы 5-35с), а проверяет сам механизм на отдельном
+`PrismaClient`/`PrismaPg` с малыми `lock_timeout: 300`/`statement_timeout: 500`
+против реальной PostgreSQL (`databaseFixture()`, тот же fixture, что и
+остальные `apps/api/test/*.test.ts`):
+- lock wait: одна транзакция держит `SELECT ... FOR UPDATE` открытой,
+  вторая — на том же пуле — получает `lock timeout` через ~300 мс; сразу
+  после этого следующий обычный запрос через тот же пул проходит
+  (335 мс, порог теста — 2000 мс), доказывая отсутствие zombie/busy
+  состояния;
+- long-running statement (`SELECT pg_sleep(2)`, без блокировки): получает
+  `statement timeout` через ~500 мс; следующий запрос через тот же пул —
+  524 мс, тоже без задержки.
+
+Оба сценария и «следующий запрос через тот же pool» проверены отдельно, как
+и запрошено. Прогон: `PASS` (см. gates ниже, `pnpm --filter @finora/api
+test` — 140/140, было 137/137: +1 test + 2 вложенных `t.test`).
+
+**7. Gates после изменения (эта сессия).**
+
+| Gate                                                                                                   | Результат                                    |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `pnpm typecheck` (3 workspace)                                                                          | PASS                                          |
+| `pnpm lint`                                                                                              | PASS (0 warnings)                             |
+| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                  | PASS — 140/140 (было 137/137)                 |
+| Targeted: `csv-import.compose.spec.ts --project=chromium --no-deps --workers=2 --retries=0`, полный `restart api` + wait-for-healthy перед каждым прогоном, локально пересобранный (`--build`) образ api с исправлением | PASS — 20/20 подряд, 0 timeout/flake |
+| `pnpm test:e2e:stage9-stress` (тот же disposable stack, `workers=1/2/4` по ротации, 20 прогонов)          | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0» |
+| `pnpm test:docker` (clean-runner: чистая копия исходников, свой disposable Compose, полный acceptance + outage/recovery + cleanup) | PASS — весь список acceptance (Stage 5/6/8/9/10 Compose, DB outage/recovery, dataset SHA-256), «Acceptance environment остановлен, его volume удалён» |
+
+Не запускались повторно (не требовались этим заданием и не менялись):
+`format:check`, `build`, `db:validate`, `api:check`, `pnpm --filter @finora/web
+test`, `pnpm test:e2e`, полный `pnpm test:e2e:auth` целиком (targeted-конфигурация
+и полный `test:e2e:stage9-stress` выше — тот же самый сценарий, что был внутри
+`test:e2e:auth`, прогнаны отдельно и целенаправленно на пересобранном образе).
+
+Playwright timeout не увеличивался, retries/sleeps в тестовый или продуктовый
+код не добавлялись, dependency upgrade не выполнялся — по прямому ограничению
+задания.
+
+#### Финальная проверка: interactive transaction timeout (30000) vs statement_timeout (35000) (следующая сессия)
+
+**Задание.** Пользователь потребовал последнюю проверку перед собственным
+commit: `statement_timeout` (35000) выше `export()`-таймаута интерактивной
+транзакции Prisma (`{ timeout: 30_000 }`,
+`transactions.service.ts:161`) — но сама интерактивная транзакция Prisma
+имеет СОБСТВЕННЫЙ client-side таймер на 30000, который срабатывает раньше
+35000. Нужно доказать по исходникам установленной `prisma@7.10.0` (не по
+документации), что происходит с реально выполняющимся на backend SQL
+statement, когда этот таймер истекает, и безопасен ли ordering 30000/35000
+именно для этого механизма — отдельно от уже доказанного в предыдущей сессии
+`lock_timeout`/`statement_timeout` механизма.
+
+**1. Фактическая семантика (исходники `@prisma/client@7.10.0/runtime/client.js`,
+класс `TransactionManager`).**
+
+- Таймер интерактивной транзакции (`#c(t,r)`) — чисто client-side `setTimeout`
+  (`tl(...)`, `.unref()`), который НЕ отправляет `CancelRequest` в Postgres и
+  не трогает уже выполняющийся на wire statement напрямую. По истечении он
+  лишь пытается перевести транзакцию в статус `"timed_out"` и запускает
+  закрытие (`#f(t,"timed_out")`).
+- Каждая операция внутри интерактивной транзакции (`#d(t,r,n)` — то, через что
+  идёт каждый `db.transaction.findMany()` в цикле `export()`) и само закрытие
+  транзакции по таймауту (`#f`) оборачиваются одним и тем же мьютексом
+  `#m(t,r)`: `t.operationQueue` — цепочка промисов
+  (`await n; try{return await r()}finally{i()}`), строго
+  сериализующая ВСЕ операции конкретной транзакции. Мьютекс освобождается
+  (`i()`) только в `finally`, то есть только когда предыдущая операция
+  реально settled (успехом либо ошибкой) — не когда её кто-то "бросил".
+- Закрытие по таймауту (`#f`) для нашего случая (`r !== "committed"`) сначала
+  ждёт (через тот же мьютекс) окончания уже идущей операции, затем реально
+  отправляет и **awaits** `ROLLBACK` (`t.transaction.executeRaw(i)`, `i="ROLLBACK"`)
+  и только в `finally` вызывает `t.transaction.rollback()` — driver-adapter
+  метод, который (см. предыдущую сессию, `@prisma/adapter-pg@7.10.0/dist/
+  index.js:712-720`) зовёт `client.release()` пула. То есть release происходит
+  строго после настоящего `ReadyForQuery` на `ROLLBACK`, а сам `ROLLBACK`
+  отправляется строго после того, как предыдущая операция (в т.ч. всё ещё
+  выполняющийся на backend statement) реально освободила мьютекс.
+- Вывод: у interactive transaction timeout Prisma НЕТ преждевременного
+  `release()` в принципе — не потому, что 30000 < 35000, а потому что
+  внутренний `operationQueue`-мьютекс структурно не даёт закрытию транзакции
+  обогнать ещё не завершённую операцию на том же соединении, независимо от
+  величины `statement_timeout`.
+
+**2. GitHub changelog `prisma/orm` 7.10.0** (проверено напрямую, не по
+пересказу): `https://github.com/prisma/orm/releases/tag/7.10.0` —
+"Prevented transaction cleanup failures after a timeout or backend
+termination from becoming unhandled promise rejections" (issue #29611),
+"Improved interactive transaction cleanup during `$disconnect()`, including
+transactions whose driver-level startup is still in progress" (#28768).
+Оба — про сам этот closing-path, но про defensive-обработку ошибок при
+закрытии/`$disconnect()`, а не про изменение мьютекс-сериализации из п.1
+(которая уже существовала раньше и является структурной причиной
+безопасности, а не следствием конкретно этих двух фиксов). Отдельный fix про
+connection leak в этом же релизе (#29612) — специфичен для
+`@prisma/adapter-mariadb`, к используемому здесь `@prisma/adapter-pg` не
+относится.
+
+**3. Эмпирическое прямое подтверждение** (реальный локальный PostgreSQL,
+малые интервалы, не production-цифры): интерактивная транзакция с
+`{ timeout: 300, maxWait: 5000 }` и одним `SELECT pg_sleep(0.6)` внутри
+(`statement_timeout: 900` на клиенте) —
+
+```
+t+152ms  pg_stat_activity: active, xact_age≈112ms, query=select pg_sleep(1)
+t+454ms  pg_stat_activity: active, xact_age≈409ms, query=select pg_sleep(1)
+t+907ms  pg_stat_activity: active, xact_age≈862ms, query=select pg_sleep(1)
+tx settled: { ok:false, err:'...A commit cannot be executed on an expired
+  transaction. The timeout for this transaction was 300 ms, however 1023 ms
+  passed...', t: 1069 }
+next query after tx settle took 2 ms -> [ { ok: 1 } ]
+final pg_stat_activity check (should be empty): []
+```
+
+Statement реально продолжал выполняться на backend ПОСЛЕ 300мс (никакого
+`CancelRequest`), промис `$transaction()` НЕ settled раньше, чем statement
+реально завершился на wire (settled на 1069мс, а не на ~300мс), а следующий
+запрос через тот же клиент/пул прошёл мгновенно (2мс) — зомби-соединения нет.
+Формализовано как регрессионный тест, см. п.5.
+
+**4. Решение по 35000: оставлен БЕЗ изменений** (вариант A из задания, с
+доказательством, не вслепую). `statement_timeout: 35000` в
+`apps/api/src/prisma/client.ts:59` безопасен относительно interactive
+transaction timeout `export()` (30000) по структурной причине из п.1, а не
+по тому, что 35000 > 30000 "с запасом": даже если бы `statement_timeout`
+был меньше 30000, `operationQueue`-мьютекс всё равно не дал бы освободить
+соединение раньше реального `ReadyForQuery`. Само соотношение 30000/35000
+(`statement_timeout` выше per-transaction бюджета `export()`) остаётся
+корректным по причине из предыдущей сессии (п.4 предыдущего аудита выше в
+этом же Stage) — `statement_timeout` не обрывает легитимный batch раньше
+времени. Единственное уточнение к прежней формулировке: caller-facing
+`export()` может в редком гоночном случае занять на практике НЕМНОГО БОЛЬШЕ
+30000мс (до времени завершения последнего in-flight batch + round-trip
+`ROLLBACK`), а не ровно 30000 — это UX/латентность, не корректность/утечка
+соединений, и ничего в кодовой базе не предполагает жёсткой гарантии "ровно
+30000мс, не больше".
+
+**5. Регрессионный тест** — `apps/api/test/db-timeout-policy.test.ts`, новый
+блок `'interactive transaction timeout короче ещё выполняющегося statement
+(< statement_timeout): следующий запрос через тот же pool не встаёт в
+зомби-очередь'`: `timeout: 300` у интерактивной транзакции,
+`statement_timeout: 900` на клиенте, `SELECT pg_sleep(0.6)` внутри —
+проверяет (а) отклонение промиса `$transaction()` с ожидаемым сообщением,
+(б) что settle произошёл НЕ раньше 550мс (иначе это означало бы
+преждевременный release — регресс механизма из п.1), (в) что следующий
+запрос через тот же клиент выполняется быстро (<300мс), (г) прямой
+PostgreSQL-сигнал: `pg_stat_activity` для этой БД не содержит ни одной
+строки с `pg_sleep` в query, ни одной `idle in transaction` сессии. Прогнано
+20/20 подряд локально — 0 flake.
+
+**6. Уточнение по 29.1с (`экспорт CSV`).** Перепроверено по
+`apps/web/e2e/csv-import.compose.spec.ts:220-260` (тест `Stage 9: экспорт
+CSV — заголовки/BOM/формула-инъекция`): тест создаёт ОДНУ транзакцию через
+API, делает поиск по уникальной строке и скачивает CSV, соответствующий
+ровно этому одному отфильтрованному ряду — то есть `export()` в этом тесте
+выполняет один batch из ~1 строки, на порядки меньше
+`EXPORT_BATCH_SIZE=2000`. 29.1с из 30с бюджета Playwright — это, как и было
+прямо написано в предыдущей сессии ("тест `экспорт CSV`... занял 29.1с"),
+время ВСЕГО Playwright test case (навигация браузера, рендер, debounce
+поиска, один HTTP round-trip) под посторонней CPU-нагрузкой (параллельные
+lint/typecheck/build той же сессии), а НЕ время выполнения самого
+PostgreSQL-запроса экспорта. Прямое подтверждение из этой сессии: в чистом
+`test:e2e:auth` (без посторонней нагрузки, 20 повторов Stage 9 stress) тот
+же тест `экспорт CSV — заголовки/BOM/формула-инъекция` стабильно укладывался
+в 273–507мс на прогон — единственный отдельный SQL batch экспорта в нём
+занимает миллисекунды, не секунды. 29.1с не является и не может напрямую
+свидетельствовать о том, что отдельному export-batch может потребоваться
+>20–25с — это была метрика другого измерения (весь e2e flow под внешней
+нагрузкой), не per-statement время.
+
+**7. Gates (эта сессия).**
+
+| Gate                                                                                                   | Результат                                    |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `pnpm lint`                                                                                             | PASS (0 warnings)                             |
+| `pnpm typecheck` (3 workspace)                                                                          | PASS                                          |
+| `pnpm --filter @finora/api test` (реальный PostgreSQL)                                                  | PASS — 141/141 (было 140/140, +1 новый тест)  |
+| Новый тест `db-timeout-policy.test.ts` изолированно, 20 повторов подряд                                 | PASS — 20/20, 0 flake                         |
+| `pnpm test:e2e:auth` (чистый checkout, пересобранный Docker, полный browser CRUD + встроенный Stage 9 stress) | PASS — «20 последовательных запусков, 80 test cases … workers=1/2/4, retries=0», `экспорт CSV` 273–507мс/прогон |
+| `pnpm test:docker` (clean-runner: чистая копия исходников, свой disposable Compose, полный acceptance + outage/recovery + cleanup) | PASS — Stage 5/6/8/9/10 Compose, DB outage/recovery, dataset SHA-256 `55c7d9a5...` (совпадает с эталонным), «Acceptance environment остановлен, его volume удалён» |
+
+`apps/api/src/prisma/client.ts` в этой сессии НЕ менялся (35000 подтверждён,
+не переписан вслепую) — изменения только в тестах и REPORT.md. Не
+запускались повторно (не требовались этим заданием и не менялись):
+`format:check`, `build`, `db:validate`, `api:check`, `pnpm --filter
+@finora/web test`, `pnpm test:e2e`.
 
 ### Итоговый статус
 
-`git status --short`:
+`git status --short` (эта сессия, только remediation timeout policy, без
+commit/push):
 
 ```
- M ARCHITECTURE.md
- M README.md
- M ROADMAP.md
+ M REPORT.md
+ M apps/api/src/prisma/client.ts
+?? apps/api/test/db-timeout-policy.test.ts
 ```
 
-Commit и push не выполнялись в этой сессии — только по отдельному
-разрешению пользователя. Дальнейшие Stage не начинались.
+Commit и push НЕ выполнялись в этой сессии — по явному указанию
+пользователя, коммит и push сделает пользователь самостоятельно. Новый
+Stage не начинался, повторный общий аудит проекта не проводился —
+проверен и исправлен только ordering timeout'ов внутри уже открытого Stage 12
+fix'а, по прямому запросу пользователя перед его собственным commit.
 
-**STAGE 12 LOCAL VALIDATION COMPLETE — REMOTE CI GATE PENDING.**
+`apps/api/src/prisma/client.ts` (diff `query_timeout` → `lock_timeout`/
+`statement_timeout`) и содержимое `REPORT.md` — из предыдущей сессии этого
+же Stage 12, без изменений в этой сессии. Новый файл
+`apps/api/test/db-timeout-policy.test.ts` — из предыдущей сессии (тесты
+`lock_timeout`/`statement_timeout`) плюс новый регрессионный блок для
+interactive transaction timeout, добавленный в этой сессии (см. выше).
+
+**STAGE 12 LOCAL REMEDIATION COMPLETE — TIMEOUT ORDERING FIXED AND FINALLY
+VERIFIED (client-side interactive transaction timeout vs server-side
+statement_timeout, по исходникам и эмпирически) — REMOTE CI RECHECK
+PENDING.**
