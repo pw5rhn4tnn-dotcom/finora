@@ -74,9 +74,30 @@ const test = base.extend<object, { csvOwner: ComposeSessions['personal'] }>({
 // CSV-импорт не отслеживается общей `finance` fixture (POST /imports
 // возвращает счётчики, а не id созданных записей), поэтому тест сам находит
 // и удаляет созданные им операции по уникальному описанию в finally.
+//
+// Общий Playwright test timeout (30s) по умолчанию делится между самим
+// сценарием и этой finally-очисткой: единственный медленный ответ сервера
+// во время cleanup проваливает тест уже ПОСЛЕ того, как сценарий сам успешно
+// прошёл, неотличимо от настоящего зависания сценария (remote CI, см.
+// REPORT.md — `GET /transactions` в этой функции не уложился в 30s при
+// полностью отзывчивом API: /health/ready на том же пуле соединений отвечал
+// за 1–13мс весь интервал). CLEANUP_TIMEOUT_MS — не круглое число "на
+// удачу": верхняя граница = серверный `statement_timeout`
+// (apps/api/src/prisma/client.ts, 35000мс — жёсткий предел, на который
+// Postgres сам может задержать ОДИН такой запрос) плюс запас на сеть/пул.
+// `test.setTimeout(...)` — официальный идиоматический механизм Playwright
+// именно для этого случая (`testInfo.setTimeout(testInfo.timeout + N)`, см.
+// playwright/types/test.d.ts) — продлевает бюджет ТОЛЬКО из этой функции
+// (вызывается только из finally), не трогая исходный test timeout, которым
+// по-прежнему ограничен сам сценарий через собственные
+// `expect(...).toBeVisible()`.
+const CLEANUP_TIMEOUT_MS = 40_000;
+
 async function cleanupBySearch(page: Page, search: string) {
+  test.setTimeout(test.info().timeout + CLEANUP_TIMEOUT_MS + 20_000);
   const response = await page.request.get(
     `/api/v1/transactions?search=${encodeURIComponent(search)}&pageSize=50`,
+    { timeout: CLEANUP_TIMEOUT_MS },
   );
   if (!response.ok()) return;
   const body = z
@@ -85,6 +106,7 @@ async function cleanupBySearch(page: Page, search: string) {
   for (const item of body.items) {
     await page.request.delete(`/api/v1/transactions/${item.id}`, {
       headers: { Origin: new URL(page.url()).origin },
+      timeout: CLEANUP_TIMEOUT_MS,
     });
   }
 }
